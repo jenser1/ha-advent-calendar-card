@@ -1,18 +1,51 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { state } from 'lit/decorators.js';
 import { version } from '../package.json';
+import {
+  DOOR_COUNT,
+  daysUntilDoor,
+  effectiveToday,
+  formatGermanDate,
+  getDoorStatus,
+  isSameDate,
+  isSeasonOver,
+  parseDebugDate,
+  type DoorStatus,
+  type EffectiveToday,
+} from './date-logic';
 import './door';
 import type { AdventCalendarCardConfig, HomeAssistant } from './types';
 
 export const CARD_TAG = 'advent-calendar-card';
-const DOOR_COUNT = 24;
+
+// So oft wird geprüft, ob ein neuer Tag begonnen hat (z. B. Wandtablet über Mitternacht).
+const DAY_CHECK_INTERVAL_MS = 60_000;
 
 export class AdventCalendarCard extends LitElement {
-  // Bewusst nicht reaktiv: HA setzt hass bei jeder Zustandsänderung neu,
-  // ein Neu-Rendern ist dafür nicht nötig.
-  hass?: HomeAssistant;
-
   @state() private config?: AdventCalendarCardConfig;
+  @state() private today?: EffectiveToday;
+  // Wird noch nicht gespeichert, geht also beim Neuladen verloren.
+  @state() private opened: ReadonlySet<number> = new Set();
+
+  private _hass?: HomeAssistant;
+  private dayTimer?: number;
+
+  get hass(): HomeAssistant | undefined {
+    return this._hass;
+  }
+
+  // Bewusst nicht reaktiv: HA setzt hass bei jeder Zustandsänderung neu.
+  // Neu berechnet wird nur, wenn sich Zeitzone oder Admin-Status ändern.
+  set hass(hass: HomeAssistant | undefined) {
+    const previous = this._hass;
+    this._hass = hass;
+    if (
+      previous?.config.time_zone !== hass?.config.time_zone ||
+      previous?.user?.is_admin !== hass?.user?.is_admin
+    ) {
+      this.refreshToday();
+    }
+  }
 
   static getStubConfig(): Omit<AdventCalendarCardConfig, 'type'> {
     return { title: 'Adventskalender' };
@@ -22,11 +55,15 @@ export class AdventCalendarCard extends LitElement {
     if (!config) {
       throw new Error('Ungültige Konfiguration.');
     }
-    const { year } = config;
+    const { year, debug_date: debugDate } = config;
     if (year !== undefined && (!Number.isInteger(year) || year < 2000 || year > 2100)) {
       throw new Error('„year“ muss eine Jahreszahl sein, z. B. 2026.');
     }
+    if (debugDate != null && debugDate !== '' && !parseDebugDate(debugDate)) {
+      throw new Error('„debug_date“ muss ein Datum im Format JJJJ-MM-TT sein, z. B. 2026-12-05.');
+    }
     this.config = config;
+    this.refreshToday();
   }
 
   getCardSize(): number {
@@ -38,23 +75,78 @@ export class AdventCalendarCard extends LitElement {
     return { columns: 12, min_columns: 6 };
   }
 
-  private get year(): number {
-    return this.config?.year ?? new Date().getFullYear();
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.refreshToday();
+    this.dayTimer = window.setInterval(() => this.refreshToday(), DAY_CHECK_INTERVAL_MS);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    window.clearInterval(this.dayTimer);
+  }
+
+  private refreshToday(): void {
+    const next = effectiveToday({
+      now: new Date(),
+      timeZone: this._hass?.config.time_zone,
+      debugDate: this.config?.debug_date,
+      isAdmin: this._hass?.user?.is_admin === true,
+    });
+    const current = this.today;
+    if (!current || current.debug !== next.debug || !isSameDate(current.date, next.date)) {
+      this.today = next;
+    }
+  }
+
+  private onDoorClick(day: number, status: DoorStatus, daysLeft: number): void {
+    if (status === 'locked') {
+      this.toast(daysLeft === 1 ? 'Noch 1 Tag!' : `Noch ${daysLeft} Tage!`);
+    } else if (status === 'openable') {
+      this.opened = new Set(this.opened).add(day);
+    }
+  }
+
+  private toast(message: string): void {
+    this.dispatchEvent(
+      new CustomEvent('hass-notification', {
+        detail: { message },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   render() {
-    if (!this.config) {
+    if (!this.config || !this.today) {
       return nothing;
     }
-    const title = this.config.title ?? `Adventskalender ${this.year}`;
+    const { date: today, debug } = this.today;
+    const year = this.config.year ?? today.year;
+    const title = this.config.title ?? `Adventskalender ${year}`;
     const days = Array.from({ length: DOOR_COUNT }, (_, i) => i + 1);
 
     return html`
       <ha-card>
         ${title ? html`<h1 class="card-header">${title}</h1>` : nothing}
+        ${debug
+          ? html`<div class="debug">🧪 Testmodus: heute ist der ${formatGermanDate(today)}</div>`
+          : nothing}
         <div class="doors">
-          ${days.map((day) => html`<advent-calendar-door .day=${day}></advent-calendar-door>`)}
+          ${days.map((day) => {
+            const status = getDoorStatus(day, year, today, this.opened.has(day));
+            return html`
+              <advent-calendar-door
+                .day=${day}
+                .status=${status}
+                @click=${() => this.onDoorClick(day, status, daysUntilDoor(day, year, today))}
+              ></advent-calendar-door>
+            `;
+          })}
         </div>
+        ${isSeasonOver(year, today)
+          ? html`<div class="stats">${this.opened.size}/${DOOR_COUNT} geöffnet</div>`
+          : nothing}
       </ha-card>
     `;
   }
@@ -68,6 +160,19 @@ export class AdventCalendarCard extends LitElement {
       container-type: inline-size;
     }
 
+    .debug {
+      margin: 0 16px 12px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: var(--warning-color, #ffa600);
+      color: #000;
+      font-size: 0.9em;
+    }
+
+    .debug:first-child {
+      margin-top: 16px;
+    }
+
     .doors {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -75,8 +180,15 @@ export class AdventCalendarCard extends LitElement {
       padding: 16px;
     }
 
-    .card-header + .doors {
+    .card-header + .doors,
+    .debug + .doors {
       padding-top: 0;
+    }
+
+    .stats {
+      padding: 0 16px 16px;
+      text-align: center;
+      color: var(--secondary-text-color);
     }
 
     @container (min-width: 480px) {

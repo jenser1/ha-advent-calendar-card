@@ -24,6 +24,11 @@ export interface AdventCalendarCardConfig {
   title?: string;
   /** Kalenderjahr; Standard ist das aktuelle Jahr. */
   year?: number;
+  /**
+   * Testdatum (JJJJ-MM-TT), wirkt nur für Admins. Kann ein Date sein,
+   * weil der YAML-Editor von HA Datumswerte als Date einliest.
+   */
+  debug_date?: string | Date;
 }
 
 /** Eintrag für den Karten-Picker im Dashboard-Editor. */
