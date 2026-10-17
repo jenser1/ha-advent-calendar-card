@@ -14,7 +14,8 @@ const STATUS_LABELS: Record<DoorStatus, string> = {
 /** Ein einzelnes Türchen im Kalender. */
 export class AdventCalendarDoor extends LitElement {
   @property({ type: Number }) day = 0;
-  @property() status: DoorStatus = 'locked';
+  /** Ohne Status (Stand noch nicht geladen) wird das Türchen neutral und nicht klickbar angezeigt. */
+  @property() status?: DoorStatus;
 
   static styles = css`
     :host {
@@ -43,6 +44,10 @@ export class AdventCalendarDoor extends LitElement {
       cursor: pointer;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
+    }
+
+    .door:disabled {
+      cursor: default;
     }
 
     .door:focus-visible {
@@ -108,8 +113,11 @@ export class AdventCalendarDoor extends LitElement {
   render() {
     return html`
       <button
-        class="door ${this.status}"
-        aria-label="Türchen ${this.day}, ${STATUS_LABELS[this.status]}"
+        class="door ${this.status ?? ''}"
+        ?disabled=${!this.status}
+        aria-label=${this.status
+          ? `Türchen ${this.day}, ${STATUS_LABELS[this.status]}`
+          : `Türchen ${this.day}`}
       >
         <span class="number">${this.day}</span>
         ${this.renderExtra()}

@@ -46,6 +46,8 @@ year: 2026
 
 Weitere Optionen folgen mit den nächsten Versionen.
 
+> **Tipp für Januar:** Ohne `year` zeigt die Karte ab dem 1. Januar den Kalender des neuen Jahres. Wer den alten Kalender noch ansehen möchte, setzt `year` auf das Vorjahr.
+
 ### Wann sich ein Türchen öffnen lässt
 
 „Heute“ ist das Datum in der Zeitzone von Home Assistant (Einstellungen → System → Allgemein), nicht die des Geräts.
@@ -59,6 +61,10 @@ Weitere Optionen folgen mit den nächsten Versionen.
 
 Ab dem 25. Dezember zeigt die Karte, wie viele Türchen geöffnet wurden.
 
+### Speicherung
+
+Welche Türchen geöffnet sind, speichert Home Assistant pro Benutzer auf dem Server (Schlüssel `advent_calendar_<Jahr>`). Der Stand gilt damit auf allen Geräten – Handy, Tablet, PC – und bleibt nach dem Neuladen erhalten. Ein eigenes Backend oder eine Integration ist dafür nicht nötig.
+
 ### Testmodus
 
 Mit `debug_date` lässt sich ein beliebiges Datum vorgeben, z. B. um den Kalender schon im November auszuprobieren:
@@ -69,6 +75,8 @@ debug_date: "2026-12-05"
 ```
 
 Das Datum gilt nur für Admins; alle anderen sehen weiterhin das echte Datum. Solange der Testmodus aktiv ist, zeigt die Karte einen Hinweis an.
+
+Im Testmodus geöffnete Türchen werden getrennt gespeichert (`advent_calendar_<Jahr>_test`), der echte Kalender bleibt unberührt. Mit **Testdaten zurücksetzen** im Hinweis fängt der Test wieder von vorn an.
 
 ## Entwicklung
 
