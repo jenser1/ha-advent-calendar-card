@@ -14,6 +14,7 @@ import {
   type EffectiveToday,
 } from './date-logic';
 import './door';
+import { findCalendar, validatePersonConfig, type CalendarMatch } from './persons';
 import {
   isOpened,
   loadState,
@@ -23,6 +24,7 @@ import {
   storageKey,
   type CalendarState,
 } from './storage';
+import { resolveTheme } from './themes';
 import type { AdventCalendarCardConfig, HomeAssistant } from './types';
 
 export const CARD_TAG = 'advent-calendar-card';
@@ -55,6 +57,7 @@ export class AdventCalendarCard extends LitElement {
     this._hass = hass;
     if (
       previous?.user?.id !== hass?.user?.id ||
+      previous?.user?.name !== hass?.user?.name ||
       previous?.user?.is_admin !== hass?.user?.is_admin ||
       previous?.config.time_zone !== hass?.config.time_zone
     ) {
@@ -77,6 +80,7 @@ export class AdventCalendarCard extends LitElement {
     if (debugDate != null && debugDate !== '' && !parseDebugDate(debugDate)) {
       throw new Error('„debug_date“ muss ein Datum im Format JJJJ-MM-TT sein, z. B. 2026-12-05.');
     }
+    validatePersonConfig(config);
     this.config = config;
     this.refresh();
   }
@@ -238,13 +242,30 @@ export class AdventCalendarCard extends LitElement {
       return nothing;
     }
     const { date: today, debug } = this.today;
-    const calendar = this.calendar;
     const title = this.config.title ?? `Adventskalender ${year}`;
+    const header = title ? html`<h1 class="card-header">${title}</h1>` : nothing;
+    const user = this._hass?.user;
+    // Solange der Benutzer unbekannt ist, wird neutral angezeigt (calendar ist dann auch undefined).
+    const match: CalendarMatch | undefined = user
+      ? findCalendar(this.config, user)
+      : { calendar: {} };
+
+    if (!match) {
+      return html`
+        <ha-card class="theme-${resolveTheme(this.config.theme)}">
+          ${header}
+          <div class="no-calendar">Für dich gibt’s noch keinen Kalender 🎅</div>
+        </ha-card>
+      `;
+    }
+
+    const calendar = this.calendar;
+    const theme = resolveTheme(match.calendar.theme, this.config.theme);
     const days = Array.from({ length: DOOR_COUNT }, (_, i) => i + 1);
 
     return html`
-      <ha-card>
-        ${title ? html`<h1 class="card-header">${title}</h1>` : nothing}
+      <ha-card class="theme-${theme}">
+        ${header}
         ${debug
           ? html`
               <div class="debug">
@@ -347,6 +368,17 @@ export class AdventCalendarCard extends LitElement {
       padding: 0 16px 16px;
       text-align: center;
       color: var(--secondary-text-color);
+    }
+
+    .no-calendar {
+      padding: 16px 16px 24px;
+      text-align: center;
+      font-size: 1.1em;
+      color: var(--secondary-text-color);
+    }
+
+    .no-calendar:first-child {
+      padding-top: 24px;
     }
 
     @container (min-width: 480px) {

@@ -14,13 +14,18 @@ export interface MockHass extends HomeAssistant {
 export function mockHass(
   options: {
     userId?: string;
+    userName?: string;
     timeZone?: string;
     isAdmin?: boolean;
     userData?: Record<string, unknown>;
   } = {},
 ): MockHass {
   const hass: MockHass = {
-    user: { id: options.userId ?? 'user-1', name: 'Jens', is_admin: options.isAdmin ?? false },
+    user: {
+      id: options.userId ?? 'user-1',
+      name: options.userName ?? 'Jens',
+      is_admin: options.isAdmin ?? false,
+    },
     config: { time_zone: options.timeZone ?? 'Europe/Berlin' },
     language: 'de',
     userData: new Map(Object.entries(options.userData ?? {})),

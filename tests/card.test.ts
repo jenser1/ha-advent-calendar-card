@@ -282,6 +282,78 @@ describe('Speicherung', () => {
   });
 });
 
+describe('Mehrere Personen', () => {
+  const family = {
+    year: 2026,
+    theme: 'winter' as const,
+    users: {
+      jens: { user_id: 'id-jens', theme: 'nerd' as const },
+      anna: { theme: 'kids' as const },
+    },
+  };
+
+  const cardTheme = (card: HTMLElement) =>
+    card.shadowRoot!.querySelector('ha-card')?.getAttribute('class');
+
+  it('zeigt Personen ihren Kalender mit eigenem Theme', async () => {
+    setNow('2026-12-05T12:00:00Z');
+    const jens = await renderCard(family, mockHass({ userId: 'id-jens' }));
+    const anna = await renderCard(family, mockHass({ userId: 'id-anna', userName: 'Anna' }));
+
+    expect(cardTheme(jens)).toBe('theme-nerd');
+    expect(cardTheme(anna)).toBe('theme-kids');
+    expect(doors(jens)).toHaveLength(24);
+    expect(doors(anna)).toHaveLength(24);
+  });
+
+  it('zeigt Benutzern ohne Eintrag einen Hinweis statt Türchen', async () => {
+    const card = await renderCard(family, mockHass({ userId: 'id-gast', userName: 'Gast' }));
+
+    expect(doors(card)).toHaveLength(0);
+    expect(card.shadowRoot!.querySelector('.no-calendar')?.textContent).toBe(
+      'Für dich gibt’s noch keinen Kalender 🎅',
+    );
+    expect(card.shadowRoot!.querySelector('.card-header')?.textContent).toBe('Adventskalender 2026');
+  });
+
+  it('zeigt Benutzern ohne Eintrag den Fallback-Kalender', async () => {
+    const card = await renderCard(
+      { ...family, fallback: { theme: 'kids' } },
+      mockHass({ userId: 'id-gast', userName: 'Gast' }),
+    );
+
+    expect(doors(card)).toHaveLength(24);
+    expect(cardTheme(card)).toBe('theme-kids');
+  });
+
+  it('nutzt ohne Personen-Theme das Theme der Karte, sonst winter', async () => {
+    const withCardTheme = await renderCard(
+      { users: { jens: { user_id: 'id-jens' } }, theme: 'nerd' },
+      mockHass({ userId: 'id-jens' }),
+    );
+    const withoutTheme = await renderCard({}, mockHass());
+
+    expect(cardTheme(withCardTheme)).toBe('theme-nerd');
+    expect(cardTheme(withoutTheme)).toBe('theme-winter');
+  });
+
+  it('wechselt den Kalender, wenn ein anderer Benutzer angemeldet ist', async () => {
+    const card = await renderCard(family, mockHass({ userId: 'id-jens' }));
+    expect(cardTheme(card)).toBe('theme-nerd');
+
+    card.hass = mockHass({ userId: 'id-gast', userName: 'Gast' });
+    await settle(card);
+    expect(card.shadowRoot!.querySelector('.no-calendar')).not.toBeNull();
+  });
+
+  it('lehnt eine fehlerhafte Personen-Konfiguration ab', () => {
+    const card = document.createElement('advent-calendar-card');
+    expect(() =>
+      card.setConfig({ type: TYPE, users: { jens: { theme: 'sommer' as 'winter' } } }),
+    ).toThrow(/users\.jens\.theme/);
+  });
+});
+
 describe('Testmodus und Speicherung', () => {
   it('speichert im Testmodus unter eigenem Schlüssel', async () => {
     setNow('2026-10-17T10:00:00Z');

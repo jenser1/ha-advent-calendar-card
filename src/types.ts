@@ -1,3 +1,5 @@
+import type { ThemeName } from './themes';
+
 /** Der Teil des `hass`-Objekts von Home Assistant, den die Karte nutzt. */
 export interface HomeAssistant {
   user?: {
@@ -29,6 +31,26 @@ export interface AdventCalendarCardConfig {
    * weil der YAML-Editor von HA Datumswerte als Date einliest.
    */
   debug_date?: string | Date;
+  /** Standard-Theme für alle Personen. */
+  theme?: ThemeName;
+  /** Personen, Schlüssel ist ein frei wählbarer Name. Ein leerer Eintrag (`anna:`) ist null. */
+  users?: Record<string, PersonConfig | null>;
+  /** Kalender für alle ohne eigenen Eintrag in `users`. */
+  fallback?: CalendarConfig | null;
+}
+
+/** Inhalt eines Türchens; die einzelnen Bausteine werden noch ausgearbeitet. */
+export type DoorContent = Record<string, unknown>;
+
+export interface CalendarConfig {
+  theme?: ThemeName;
+  /** Türchen 1–24; ein leerer Eintrag (`3:`) ist null. */
+  doors?: Record<number, DoorContent | null> | null;
+}
+
+export interface PersonConfig extends CalendarConfig {
+  /** Feste Zuordnung zu einem HA-Benutzer; ohne sie zählt der Benutzername. */
+  user_id?: string;
 }
 
 /** Eintrag für den Karten-Picker im Dashboard-Editor. */

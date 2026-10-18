@@ -43,10 +43,42 @@ year: 2026
 | `title`      | Text               | `Adventskalender <Jahr>` | Überschrift; `""` blendet sie aus                   |
 | `year`       | Zahl               | aktuelles Jahr           | Jahr, für das der Kalender gilt                     |
 | `debug_date` | Datum `JJJJ-MM-TT` | –                        | Testdatum, wirkt nur für Admins (siehe Testmodus)   |
+| `theme`      | `winter`, `kids`, `nerd` | `winter`           | Standard-Theme für alle Personen                    |
+| `users`      | Personen           | –                        | Ein Kalender pro Person (siehe Personen)            |
+| `fallback`   | Kalender           | –                        | Für alle ohne eigenen Eintrag in `users`            |
 
 Weitere Optionen folgen mit den nächsten Versionen.
 
 > **Tipp für Januar:** Ohne `year` zeigt die Karte ab dem 1. Januar den Kalender des neuen Jahres. Wer den alten Kalender noch ansehen möchte, setzt `year` auf das Vorjahr.
+
+### Personen
+
+Jede Person bekommt unter `users` einen Eintrag mit frei wählbarem Namen:
+
+```yaml
+type: custom:advent-calendar-card
+theme: winter
+users:
+  jens:
+    user_id: 8f2c4e…   # optional, feste Zuordnung zum HA-Benutzer
+    theme: nerd        # optional, sonst das Theme der Karte
+    doors:
+      1: { text: "…" }
+  anna:                # ohne user_id: Zuordnung über den HA-Benutzernamen „Anna“
+    theme: kids
+fallback:              # optional, z. B. für ein Gäste-Tablet
+  doors:
+    1: { text: "…" }
+```
+
+So findet die Karte den Kalender des angemeldeten Benutzers:
+
+1. Eintrag, dessen `user_id` passt
+2. sonst ein Eintrag ohne `user_id`, dessen Name dem HA-Benutzernamen entspricht (Groß-/Kleinschreibung egal)
+3. sonst `fallback`
+4. sonst der Hinweis „Für dich gibt’s noch keinen Kalender 🎅“
+
+Ohne `users` sehen alle denselben Kalender. Die `user_id` steht in Home Assistant unter **Einstellungen → Personen → Benutzer** in den Details des Benutzers (erweiterter Modus nötig). Welche Türchen geöffnet sind, wird immer pro HA-Benutzer gespeichert.
 
 ### Wann sich ein Türchen öffnen lässt
 
