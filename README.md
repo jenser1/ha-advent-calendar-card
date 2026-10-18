@@ -112,12 +112,45 @@ doors:
 | `task`   | Mini-Aufgabe oder Gutschein mit „Erledigt“-Haken; der Haken wird pro Benutzer gespeichert  |
 | `link`   | Adresse oder `url`, `title`, `description`, `kind` (`web`, `shop`, `video`, `github`)      |
 | `video`  | YouTube-Link (auch youtu.be und Shorts) oder eigene Videodatei (`.mp4`, `.webm`, …)        |
-| `effect` | Service-Aufruf beim ersten Öffnen (folgt)                                                  |
+| `effect` | Ein oder mehrere Service-Aufrufe beim ersten Öffnen (siehe Effekte)                        |
 
 - **GitHub-Karte:** Bei `kind: github` lädt der Browser Beschreibung und ⭐ über die öffentliche GitHub-API und merkt sie sich einen Tag lang. Klappt das nicht, zeigt die Karte `title` und die Adresse.
 - **YouTube** wird über `youtube-nocookie.com` eingebettet. YouTube setzt damit erst Cookies, wenn das Video abgespielt wird.
 - Adressen müssen mit `https://`, `http://` oder `/` beginnen. Tippfehler bei Bausteinen (z. B. `txt:`) meldet die Karte als Fehler.
 - Ein Türchen ohne Inhalt lässt sich trotzdem öffnen und zeigt `empty_text`.
+
+### Effekte
+
+Beim **ersten** Öffnen eines Türchens kann die Karte beliebige Dienste in Home Assistant aufrufen – Licht, Musik, Szenen oder Scripts. Beim erneuten Ansehen passiert nichts, auch nicht auf einem anderen Gerät.
+
+```yaml
+doors:
+  4:
+    text: "Schau mal ins Wohnzimmer ✨"
+    effect:
+      action: script.advent_lichtshow
+  6:
+    text: "Nikolaus! Stiefel checken 🥾"
+    effect:                       # mehrere Effekte als Liste
+      - action: script.advent_nikolaus
+      - action: light.turn_on
+        target:
+          entity_id: light.flur
+        data:
+          flash: long
+  7:
+    effect:                       # ältere Schreibweise mit service: geht auch
+      service: script.turn_on
+      target:
+        entity_id: script.advent_weihnachtsmusik
+```
+
+- Scripts bekommen automatisch die Variablen `tag` (1–24) und `person` (Name aus `users`, beim Fallback der HA-Benutzername). Bei `script.turn_on` landen sie unter `variables`. Eigene Angaben in der YAML haben Vorrang.
+- Fehlt ein Script oder eine Entität, oder schlägt der Aufruf fehl, zeigt die Karte einen Hinweis. Das Türchen ist trotzdem geöffnet.
+- Effekte laufen auch im Testmodus; nach **Testdaten zurücksetzen** lösen sie erneut aus.
+- Effekte laufen über `hass.callService` mit den Rechten des angemeldeten Benutzers. Scripts dürfen auch Nicht-Admins starten.
+- Beispiel-Scripts für Lichtshow, Weihnachtsmusik und Nikolaus stehen in [`examples/scripts.yaml`](examples/scripts.yaml).
+- Tipp: Schreib zu einem Effekt einen `text` dazu – sonst zeigt der Dialog `empty_text`.
 
 ### Wann sich ein Türchen öffnen lässt
 

@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { state } from 'lit/decorators.js';
 import { version } from '../package.json';
+import { runEffects, type EffectVariables } from './blocks/effect';
 import {
   DOOR_COUNT,
   daysUntilDoor,
@@ -28,7 +29,7 @@ import {
   type CalendarState,
 } from './storage';
 import { resolveTheme } from './themes';
-import type { AdventCalendarCardConfig, HomeAssistant } from './types';
+import type { AdventCalendarCardConfig, EffectConfig, HomeAssistant } from './types';
 
 export const CARD_TAG = 'advent-calendar-card';
 
@@ -204,15 +205,25 @@ export class AdventCalendarCard extends LitElement {
     const key = this.storageKey;
     const id = this.currentCalendarId;
     const before = this.calendar;
-    if (!hass || !key || !before) {
+    const user = hass?.user;
+    if (!hass || !key || !before || !user || !this.config) {
       return;
     }
+    const match = findCalendar(this.config, user);
     // Sofort anzeigen, Speichern läuft im Hintergrund.
     this.calendar = { ...before, opened: { ...before.opened, [day]: new Date().toISOString() } };
     try {
-      const { state } = await markOpened(hass, key, day, new Date());
+      const { state, newlyOpened } = await markOpened(hass, key, day, new Date());
       if (id === this.currentCalendarId) {
         this.calendar = state;
+      }
+      // Erst nach Bestätigung durch den Server: So löst ein Türchen, das schon
+      // auf einem anderen Gerät geöffnet wurde, den Effekt nicht noch einmal aus.
+      if (newlyOpened) {
+        void this.triggerEffects(hass, match?.calendar.doors?.[day]?.effect, {
+          tag: day,
+          person: match?.person ?? user.name,
+        });
       }
     } catch (err) {
       console.error('[advent-calendar-card] Speichern fehlgeschlagen:', err);
@@ -220,6 +231,18 @@ export class AdventCalendarCard extends LitElement {
         this.calendar = before;
       }
       this.toast('Türchen konnte nicht gespeichert werden. Bitte nochmal versuchen.');
+    }
+  }
+
+  private async triggerEffects(
+    hass: HomeAssistant,
+    effect: EffectConfig | undefined,
+    variables: EffectVariables,
+  ): Promise<void> {
+    const errors = await runEffects(hass, effect, variables);
+    if (errors.length > 0) {
+      console.warn('[advent-calendar-card] Effekt nicht möglich:', errors);
+      this.toast(`Effekt nicht möglich: ${errors.join(' · ')}`);
     }
   }
 

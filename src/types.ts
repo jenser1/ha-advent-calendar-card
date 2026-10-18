@@ -11,11 +11,17 @@ export interface HomeAssistant {
     time_zone: string;
   };
   language: string;
+  /** Zustände aller Entitäten, Schlüssel ist die entity_id. */
+  states?: Record<string, unknown>;
+  /** Verfügbare Dienste: domain → service → Beschreibung. */
+  services?: Record<string, Record<string, unknown>>;
   callService(
     domain: string,
     service: string,
     serviceData?: Record<string, unknown>,
     target?: Record<string, unknown>,
+    /** false: HA zeigt bei Fehlern keinen eigenen Toast. */
+    notifyOnError?: boolean,
   ): Promise<unknown>;
   callWS<T>(msg: { type: string; [key: string]: unknown }): Promise<T>;
 }
@@ -64,9 +70,19 @@ export interface DoorContent {
   link?: string | LinkBlock;
   /** YouTube-Link oder eigene Videodatei. */
   video?: string;
-  /** Service-Call beim ersten Öffnen. */
-  effect?: Record<string, unknown>;
+  /** Ein oder mehrere Service-Aufrufe beim ersten Öffnen. */
+  effect?: EffectConfig;
 }
+
+export interface EffectCall {
+  /** „domain.service“, z. B. script.turn_on; `service` ist die ältere Schreibweise. */
+  action?: string;
+  service?: string;
+  data?: Record<string, unknown>;
+  target?: Record<string, string | string[]>;
+}
+
+export type EffectConfig = EffectCall | EffectCall[];
 
 export interface CalendarConfig {
   theme?: ThemeName;

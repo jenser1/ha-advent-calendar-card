@@ -1,0 +1,93 @@
+# Beispiel-Scripts für Effekte der Adventskalender-Karte.
+#
+# Einbinden: in die scripts.yaml von Home Assistant übernehmen oder einzeln unter
+# Einstellungen → Automationen & Szenen → Scripts → Script erstellen → ⋮ → In YAML bearbeiten.
+# Die Entitäten (light.wohnzimmer, media_player.wohnzimmer, …) an das eigene Zuhause anpassen.
+#
+# Die Karte gibt jedem Script automatisch die Variablen `tag` (1–24) und `person`
+# (Name aus `users`, z. B. jens) mit. Sie stehen in Templates als {{ tag }} und {{ person }} bereit.
+#
+# In der Karte z. B.:
+#   doors:
+#     4:
+#       text: "Schau mal ins Wohnzimmer ✨"
+#       effect:
+#         action: script.advent_lichtshow
+
+advent_lichtshow:
+  alias: "Advent – Lichtshow"
+  icon: mdi:string-lights
+  mode: single
+  sequence:
+    # Aktuellen Zustand merken, damit das Licht danach wieder so ist wie vorher.
+    - action: scene.create
+      data:
+        scene_id: advent_vorher
+        snapshot_entities:
+          - light.wohnzimmer
+    - repeat:
+        count: 3
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.wohnzimmer
+            data:
+              rgb_color: [220, 20, 20]
+              brightness_pct: 100
+          - delay:
+              seconds: 1
+          - action: light.turn_on
+            target:
+              entity_id: light.wohnzimmer
+            data:
+              rgb_color: [20, 160, 40]
+              brightness_pct: 100
+          - delay:
+              seconds: 1
+          - action: light.turn_on
+            target:
+              entity_id: light.wohnzimmer
+            data:
+              rgb_color: [255, 190, 60]
+              brightness_pct: 100
+          - delay:
+              seconds: 1
+    - action: scene.turn_on
+      target:
+        entity_id: scene.advent_vorher
+
+advent_weihnachtsmusik:
+  alias: "Advent – Weihnachtsmusik"
+  icon: mdi:music
+  mode: single
+  sequence:
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.wohnzimmer
+      data:
+        volume_level: 0.3
+    # Eigene Musikdatei (z. B. unter /config/www/advent/) oder Stream-Adresse eintragen.
+    # Mit Music Assistant geht stattdessen auch music_assistant.play_media.
+    - action: media_player.play_media
+      target:
+        entity_id: media_player.wohnzimmer
+      data:
+        media_content_id: "http://homeassistant.local:8123/local/advent/jingle-bells.mp3"
+        media_content_type: music
+
+advent_nikolaus:
+  alias: "Advent – Nikolaus"
+  icon: mdi:gift
+  mode: single
+  sequence:
+    - action: persistent_notification.create
+      data:
+        title: "🎅 Der Nikolaus war da!"
+        message: >-
+          {{ person | default('Jemand') }} hat Türchen {{ tag | default(6) }} geöffnet –
+          schnell die Stiefel checken! 🥾
+    - action: light.turn_on
+      target:
+        entity_id: light.flur
+      data:
+        flash: long

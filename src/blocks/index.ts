@@ -1,5 +1,6 @@
 import type { TemplateResult } from 'lit';
 import type { DoorContent } from '../types';
+import { validateEffect } from './effect';
 import { imageStyles, renderImage } from './image';
 import { LINK_KINDS, linkStyles, renderLink } from './link';
 import { renderTask, taskStyles } from './task';
@@ -85,8 +86,8 @@ export function validateDoorContent(content: Record<string, unknown>, path: stri
   if (content.link !== undefined) {
     validateLink(content.link, `${path}.link`);
   }
-  if (content.effect !== undefined && !isRecord(content.effect)) {
-    throw new Error(`„${path}.effect“ muss einen Service-Aufruf enthalten, z. B. „service: …“.`);
+  if (content.effect !== undefined) {
+    validateEffect(content.effect, `${path}.effect`);
   }
 }
 
