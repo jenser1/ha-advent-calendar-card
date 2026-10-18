@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   emptyState,
+  isDone,
   isOpened,
   loadState,
   markOpened,
@@ -8,6 +9,7 @@ import {
   parseStoredState,
   resetState,
   saveState,
+  setTaskDone,
   storageKey,
 } from '../src/storage';
 import { mockHass } from './mock-hass';
@@ -40,19 +42,27 @@ describe('parseStoredState', () => {
     expect(isOpened(state, 3)).toBe(false);
     expect(openedCount(state)).toBe(2);
   });
+
+  it('liest den Erledigt-Status und kommt mit älteren Ständen ohne ihn klar', () => {
+    const state = parseStoredState({ version: 1, opened: { 2: 'a' }, done: { 2: 'b', 30: 'x' } });
+    expect(state.done).toEqual({ 2: 'b' });
+    expect(isDone(state, 2)).toBe(true);
+    expect(parseStoredState({ version: 1, opened: { 2: 'a' } }).done).toEqual({});
+  });
 });
 
 describe('Laden und Speichern', () => {
   it('nutzt frontend/get_user_data und frontend/set_user_data', async () => {
     const hass = mockHass();
-    await saveState(hass, KEY, { opened: { 2: '2026-12-02T09:00:00Z' } });
+    const state = { opened: { 2: '2026-12-02T09:00:00Z' }, done: { 2: '2026-12-02T10:00:00Z' } };
+    await saveState(hass, KEY, state);
 
     expect(hass.calls[0]).toEqual({
       type: 'frontend/set_user_data',
       key: KEY,
-      value: { version: 1, opened: { 2: '2026-12-02T09:00:00Z' } },
+      value: { version: 1, ...state },
     });
-    expect(await loadState(hass, KEY)).toEqual({ opened: { 2: '2026-12-02T09:00:00Z' } });
+    expect(await loadState(hass, KEY)).toEqual(state);
     expect(hass.calls[1]).toEqual({ type: 'frontend/get_user_data', key: KEY });
   });
 
@@ -92,6 +102,34 @@ describe('markOpened', () => {
     await markOpened(hass, storageKey(2026, true), 5, NOW);
 
     expect([...hass.userData.keys()]).toEqual(['advent_calendar_2026_test']);
+  });
+
+  it('behält den Erledigt-Status', async () => {
+    const hass = mockHass({
+      userData: { [KEY]: { version: 1, opened: { 4: 'a' }, done: { 4: 'b' } } },
+    });
+    const result = await markOpened(hass, KEY, 5, NOW);
+    expect(result.state.done).toEqual({ 4: 'b' });
+  });
+});
+
+describe('setTaskDone', () => {
+  it('setzt und entfernt den Haken', async () => {
+    const hass = mockHass({ userData: { [KEY]: { version: 1, opened: { 5: 'a' } } } });
+
+    const done = await setTaskDone(hass, KEY, 5, true, NOW);
+    expect(done).toEqual({ opened: { 5: 'a' }, done: { 5: '2026-12-05T08:15:00.000Z' } });
+    expect(await loadState(hass, KEY)).toEqual(done);
+
+    const undone = await setTaskDone(hass, KEY, 5, false, NOW);
+    expect(undone).toEqual({ opened: { 5: 'a' }, done: {} });
+    expect(await loadState(hass, KEY)).toEqual(undone);
+  });
+
+  it('speichert nicht, wenn sich nichts ändert', async () => {
+    const hass = mockHass({ userData: { [KEY]: { version: 1, opened: {}, done: { 5: 'a' } } } });
+    await setTaskDone(hass, KEY, 5, true, NOW);
+    expect(hass.calls.some((call) => call.type === 'frontend/set_user_data')).toBe(false);
   });
 });
 

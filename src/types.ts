@@ -33,14 +33,40 @@ export interface AdventCalendarCardConfig {
   debug_date?: string | Date;
   /** Standard-Theme für alle Personen. */
   theme?: ThemeName;
+  /** Text im Dialog, wenn für ein Türchen kein Inhalt eingetragen ist. */
+  empty_text?: string;
   /** Personen, Schlüssel ist ein frei wählbarer Name. Ein leerer Eintrag (`anna:`) ist null. */
   users?: Record<string, PersonConfig | null>;
   /** Kalender für alle ohne eigenen Eintrag in `users`. */
   fallback?: CalendarConfig | null;
 }
 
-/** Inhalt eines Türchens; die einzelnen Bausteine werden noch ausgearbeitet. */
-export type DoorContent = Record<string, unknown>;
+export type LinkKind = 'github' | 'video' | 'shop' | 'web';
+
+export interface LinkBlock {
+  url: string;
+  title?: string;
+  description?: string;
+  /** Standard: web */
+  kind?: LinkKind;
+}
+
+/** Inhalt eines Türchens; die Bausteine erscheinen in der Reihenfolge aus der YAML. */
+export interface DoorContent {
+  /** Spruch, Rätsel oder Fakt. */
+  text?: string;
+  /** Lösung zum Rätsel in `text`, hinter einem „Lösung zeigen“-Button. */
+  answer?: string;
+  /** Bild oder GIF (/local/... oder https://...). */
+  image?: string;
+  /** Mini-Aufgabe oder Gutschein mit „Erledigt“-Haken. */
+  task?: string;
+  link?: string | LinkBlock;
+  /** YouTube-Link oder eigene Videodatei. */
+  video?: string;
+  /** Service-Call beim ersten Öffnen. */
+  effect?: Record<string, unknown>;
+}
 
 export interface CalendarConfig {
   theme?: ThemeName;

@@ -14,13 +14,16 @@ import {
   type EffectiveToday,
 } from './date-logic';
 import './door';
+import { DEFAULT_EMPTY_TEXT } from './door-dialog';
 import { findCalendar, validatePersonConfig, type CalendarMatch } from './persons';
 import {
+  isDone,
   isOpened,
   loadState,
   markOpened,
   openedCount,
   resetState,
+  setTaskDone,
   storageKey,
   type CalendarState,
 } from './storage';
@@ -38,6 +41,8 @@ export class AdventCalendarCard extends LitElement {
   /** Gespeicherter Stand; undefined, solange er nicht geladen ist. */
   @state() private calendar?: CalendarState;
   @state() private loadFailed = false;
+  /** Türchen, dessen Inhalt gerade im Dialog angezeigt wird. */
+  @state() private openDay?: number;
 
   private _hass?: HomeAssistant;
   private dayTimer?: number;
@@ -79,6 +84,9 @@ export class AdventCalendarCard extends LitElement {
     }
     if (debugDate != null && debugDate !== '' && !parseDebugDate(debugDate)) {
       throw new Error('„debug_date“ muss ein Datum im Format JJJJ-MM-TT sein, z. B. 2026-12-05.');
+    }
+    if (config.empty_text !== undefined && typeof config.empty_text !== 'string') {
+      throw new Error('„empty_text“ muss ein Text sein.');
     }
     validatePersonConfig(config);
     this.config = config;
@@ -163,6 +171,7 @@ export class AdventCalendarCard extends LitElement {
       // Anderer Benutzer oder anderes Jahr: alten Stand nicht weiter anzeigen.
       this.calendar = undefined;
       this.calendarId = id;
+      this.openDay = undefined;
     }
     const request = ++this.loadRequest;
     try {
@@ -184,6 +193,9 @@ export class AdventCalendarCard extends LitElement {
       this.toast(daysLeft === 1 ? 'Noch 1 Tag!' : `Noch ${daysLeft} Tage!`);
     } else if (status === 'openable') {
       void this.openDoor(day);
+      this.openDay = day;
+    } else if (status === 'opened') {
+      this.openDay = day;
     }
   }
 
@@ -196,7 +208,7 @@ export class AdventCalendarCard extends LitElement {
       return;
     }
     // Sofort anzeigen, Speichern läuft im Hintergrund.
-    this.calendar = { opened: { ...before.opened, [day]: new Date().toISOString() } };
+    this.calendar = { ...before, opened: { ...before.opened, [day]: new Date().toISOString() } };
     try {
       const { state } = await markOpened(hass, key, day, new Date());
       if (id === this.currentCalendarId) {
@@ -208,6 +220,36 @@ export class AdventCalendarCard extends LitElement {
         this.calendar = before;
       }
       this.toast('Türchen konnte nicht gespeichert werden. Bitte nochmal versuchen.');
+    }
+  }
+
+  private async onTaskToggle(event: CustomEvent<{ day: number; done: boolean }>): Promise<void> {
+    const { day, done } = event.detail;
+    const hass = this._hass;
+    const key = this.storageKey;
+    const id = this.currentCalendarId;
+    const before = this.calendar;
+    if (!hass || !key || !before) {
+      return;
+    }
+    const doneMap = { ...before.done };
+    if (done) {
+      doneMap[day] = new Date().toISOString();
+    } else {
+      delete doneMap[day];
+    }
+    this.calendar = { ...before, done: doneMap };
+    try {
+      const state = await setTaskDone(hass, key, day, done, new Date());
+      if (id === this.currentCalendarId) {
+        this.calendar = state;
+      }
+    } catch (err) {
+      console.error('[advent-calendar-card] Speichern fehlgeschlagen:', err);
+      if (id === this.currentCalendarId) {
+        this.calendar = before;
+      }
+      this.toast('Konnte nicht gespeichert werden. Bitte nochmal versuchen.');
     }
   }
 
@@ -262,6 +304,7 @@ export class AdventCalendarCard extends LitElement {
     const calendar = this.calendar;
     const theme = resolveTheme(match.calendar.theme, this.config.theme);
     const days = Array.from({ length: DOOR_COUNT }, (_, i) => i + 1);
+    const openDay = this.openDay;
 
     return html`
       <ha-card class="theme-${theme}">
@@ -297,6 +340,15 @@ export class AdventCalendarCard extends LitElement {
         ${calendar && isSeasonOver(year, today)
           ? html`<div class="stats">${openedCount(calendar)}/${DOOR_COUNT} geöffnet</div>`
           : nothing}
+        <advent-calendar-dialog
+          .open=${openDay !== undefined}
+          .day=${openDay ?? 0}
+          .content=${openDay === undefined ? null : (match.calendar.doors?.[openDay] ?? null)}
+          .emptyText=${this.config.empty_text ?? DEFAULT_EMPTY_TEXT}
+          .taskDone=${!!calendar && openDay !== undefined && isDone(calendar, openDay)}
+          @dialog-closed=${() => (this.openDay = undefined)}
+          @task-toggle=${this.onTaskToggle}
+        ></advent-calendar-dialog>
       </ha-card>
     `;
   }

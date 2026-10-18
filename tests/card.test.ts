@@ -1,50 +1,17 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import '../src/advent-calendar-card';
-import type { AdventCalendarCardConfig, HomeAssistant } from '../src/types';
 import { mockHass } from './mock-hass';
-
-const TYPE = 'custom:advent-calendar-card';
-const KEY = 'advent_calendar_2026';
-const TEST_KEY = 'advent_calendar_2026_test';
-
-/** Wartet, bis Laden/Speichern über den (gemockten) WebSocket durch ist. */
-async function settle(card: HTMLElement & { updateComplete: Promise<boolean> }) {
-  for (let i = 0; i < 3; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await card.updateComplete;
-  }
-}
-
-async function renderCard(config: Omit<AdventCalendarCardConfig, 'type'>, hass?: HomeAssistant) {
-  const card = document.createElement('advent-calendar-card');
-  card.setConfig({ type: TYPE, ...config });
-  card.hass = hass;
-  document.body.append(card);
-  await settle(card);
-  return card;
-}
-
-function doors(card: HTMLElement) {
-  return [...card.shadowRoot!.querySelectorAll('advent-calendar-door')];
-}
-
-function statuses(card: HTMLElement) {
-  return doors(card).map((door) => door.status);
-}
-
-function toasts(card: HTMLElement): string[] {
-  const messages: string[] = [];
-  card.addEventListener('hass-notification', (event) => {
-    messages.push((event as CustomEvent<{ message: string }>).detail.message);
-  });
-  return messages;
-}
-
-function setNow(iso: string) {
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(iso));
-}
+import {
+  KEY,
+  TEST_KEY,
+  TYPE,
+  doors,
+  renderCard,
+  setNow,
+  settle,
+  statuses,
+  toasts,
+} from './render-card';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -226,6 +193,7 @@ describe('Speicherung', () => {
     expect(hass.userData.get(KEY)).toEqual({
       version: 1,
       opened: { 5: '2026-12-05T12:00:00.000Z' },
+      done: {},
     });
   });
 
@@ -369,6 +337,7 @@ describe('Testmodus und Speicherung', () => {
     expect(hass.userData.get(TEST_KEY)).toEqual({
       version: 1,
       opened: { 5: '2026-10-17T10:00:00.000Z' },
+      done: {},
     });
     expect(hass.userData.get(KEY)).toEqual({ version: 1, opened: {} });
   });
@@ -390,7 +359,7 @@ describe('Testmodus und Speicherung', () => {
     await settle(card);
 
     expect(statuses(card)[4]).toBe('openable');
-    expect(hass.userData.get(TEST_KEY)).toEqual({ version: 1, opened: {} });
+    expect(hass.userData.get(TEST_KEY)).toEqual({ version: 1, opened: {}, done: {} });
     expect(hass.userData.get(KEY)).toEqual({ version: 1, opened: { 1: 'echt' } });
     expect(messages).toEqual(['Testdaten zurückgesetzt.']);
   });

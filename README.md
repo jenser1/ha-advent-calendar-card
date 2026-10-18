@@ -46,6 +46,7 @@ year: 2026
 | `theme`      | `winter`, `kids`, `nerd` | `winter`           | Standard-Theme für alle Personen                    |
 | `users`      | Personen           | –                        | Ein Kalender pro Person (siehe Personen)            |
 | `fallback`   | Kalender           | –                        | Für alle ohne eigenen Eintrag in `users`            |
+| `empty_text` | Text               | „Heute ist das Türchen leer …“ | Text für Türchen ohne Inhalt                  |
 
 Weitere Optionen folgen mit den nächsten Versionen.
 
@@ -80,6 +81,44 @@ So findet die Karte den Kalender des angemeldeten Benutzers:
 
 Ohne `users` sehen alle denselben Kalender. Die `user_id` steht in Home Assistant unter **Einstellungen → Personen → Benutzer** in den Details des Benutzers (erweiterter Modus nötig). Welche Türchen geöffnet sind, wird immer pro HA-Benutzer gespeichert.
 
+### Inhalte der Türchen
+
+Jedes Türchen kann mehrere Bausteine kombinieren. Sie erscheinen in der Reihenfolge, in der sie in der YAML stehen.
+
+```yaml
+doors:
+  1:
+    text: "Wusstest du? Der erste Adventskranz hatte 24 Kerzen."
+    image: /local/advent/jens/01.gif
+  2:
+    text: "Was ist grün und klopft an die Tür?"
+    answer: "Ein Klopfsalat 🥬"
+  3:
+    task: "Gutschein: 1x Frühstück ans Bett 🥐"
+  4:
+    link:
+      title: "Mein Vorrat-Add-on für Home Assistant"
+      url: https://github.com/jenser1/ha-vorrat-addon
+      kind: github
+  5:
+    video: https://www.youtube.com/watch?v=XXXXXXXXXXX
+```
+
+| Baustein | Inhalt                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------ |
+| `text`   | Spruch, Rätsel oder Fakt; Zeilenumbrüche (`text: \|`) bleiben erhalten                     |
+| `answer` | Lösung zum Rätsel in `text`, erscheint nach Klick auf „Lösung zeigen“                      |
+| `image`  | Bild oder GIF, `/local/…` oder `https://…`                                                 |
+| `task`   | Mini-Aufgabe oder Gutschein mit „Erledigt“-Haken; der Haken wird pro Benutzer gespeichert  |
+| `link`   | Adresse oder `url`, `title`, `description`, `kind` (`web`, `shop`, `video`, `github`)      |
+| `video`  | YouTube-Link (auch youtu.be und Shorts) oder eigene Videodatei (`.mp4`, `.webm`, …)        |
+| `effect` | Service-Aufruf beim ersten Öffnen (folgt)                                                  |
+
+- **GitHub-Karte:** Bei `kind: github` lädt der Browser Beschreibung und ⭐ über die öffentliche GitHub-API und merkt sie sich einen Tag lang. Klappt das nicht, zeigt die Karte `title` und die Adresse.
+- **YouTube** wird über `youtube-nocookie.com` eingebettet. YouTube setzt damit erst Cookies, wenn das Video abgespielt wird.
+- Adressen müssen mit `https://`, `http://` oder `/` beginnen. Tippfehler bei Bausteinen (z. B. `txt:`) meldet die Karte als Fehler.
+- Ein Türchen ohne Inhalt lässt sich trotzdem öffnen und zeigt `empty_text`.
+
 ### Wann sich ein Türchen öffnen lässt
 
 „Heute“ ist das Datum in der Zeitzone von Home Assistant (Einstellungen → System → Allgemein), nicht die des Geräts.
@@ -88,7 +127,7 @@ Ohne `users` sehen alle denselben Kalender. Die `user_id` steht in Home Assistan
 | --------- | --------------------------------------- | ------------------------------- |
 | gesperrt  | Tag liegt in der Zukunft                | 🔒, beim Antippen „Noch X Tage!“ |
 | öffenbar  | heute ist der Tag                       | leuchtet, „Heute!“              |
-| offen     | wurde geöffnet                          | ✔, jederzeit wieder ansehbar    |
+| offen     | wurde geöffnet                          | ✔, Inhalt jederzeit wieder ansehbar |
 | verpasst  | Tag ist vorbei, nie geöffnet            | grau, „Verpasst 😢“             |
 
 Ab dem 25. Dezember zeigt die Karte, wie viele Türchen geöffnet wurden.

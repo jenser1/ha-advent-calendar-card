@@ -1,3 +1,4 @@
+import { validateDoorContent } from './blocks';
 import { DOOR_COUNT } from './date-logic';
 import { THEMES, isThemeName } from './themes';
 import type { AdventCalendarCardConfig, CalendarConfig } from './types';
@@ -72,9 +73,13 @@ function validateCalendar(value: unknown, path: string): void {
     if (!Number.isInteger(day) || day < 1 || day > DOOR_COUNT) {
       throw new Error(`„${path}.doors“: „${key}“ ist kein Türchen, erlaubt sind 1 bis ${DOOR_COUNT}.`);
     }
-    if (content != null && !isRecord(content)) {
+    if (content == null) {
+      continue;
+    }
+    if (!isRecord(content)) {
       throw new Error(`„${path}.doors.${key}“ muss Inhalte enthalten, z. B. „text: …“.`);
     }
+    validateDoorContent(content, `${path}.doors.${key}`);
   }
 }
 

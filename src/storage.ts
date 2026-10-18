@@ -5,6 +5,8 @@ import type { HomeAssistant } from './types';
 export interface CalendarState {
   /** Tag → Zeitpunkt des ersten Öffnens (ISO-Zeitstempel). */
   opened: Record<number, string>;
+  /** Tag → Zeitpunkt, an dem die Aufgabe/der Gutschein als erledigt markiert wurde. */
+  done: Record<number, string>;
 }
 
 const STORAGE_VERSION = 1;
@@ -19,30 +21,41 @@ export function storageKey(year: number, test: boolean): string {
 }
 
 export function emptyState(): CalendarState {
-  return { opened: {} };
+  return { opened: {}, done: {} };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Wandelt gespeicherte Daten in einen gültigen Stand um; Ungültiges wird verworfen. */
-export function parseStoredState(value: unknown): CalendarState {
-  const state = emptyState();
-  if (!isRecord(value) || !isRecord(value.opened)) {
-    return state;
+function parseDayMap(value: unknown): Record<number, string> {
+  const result: Record<number, string> = {};
+  if (!isRecord(value)) {
+    return result;
   }
-  for (const [key, openedAt] of Object.entries(value.opened)) {
+  for (const [key, at] of Object.entries(value)) {
     const day = Number(key);
-    if (Number.isInteger(day) && day >= 1 && day <= DOOR_COUNT && typeof openedAt === 'string') {
-      state.opened[day] = openedAt;
+    if (Number.isInteger(day) && day >= 1 && day <= DOOR_COUNT && typeof at === 'string') {
+      result[day] = at;
     }
   }
-  return state;
+  return result;
+}
+
+/** Wandelt gespeicherte Daten in einen gültigen Stand um; Ungültiges wird verworfen. */
+export function parseStoredState(value: unknown): CalendarState {
+  if (!isRecord(value)) {
+    return emptyState();
+  }
+  return { opened: parseDayMap(value.opened), done: parseDayMap(value.done) };
 }
 
 export function isOpened(state: CalendarState, day: number): boolean {
   return day in state.opened;
+}
+
+export function isDone(state: CalendarState, day: number): boolean {
+  return day in state.done;
 }
 
 export function openedCount(state: CalendarState): number {
@@ -65,7 +78,7 @@ export async function saveState(
   await hass.callWS({
     type: 'frontend/set_user_data',
     key,
-    value: { version: STORAGE_VERSION, opened: state.opened },
+    value: { version: STORAGE_VERSION, opened: state.opened, done: state.done },
   });
 }
 
@@ -84,9 +97,32 @@ export async function markOpened(
   if (isOpened(current, day)) {
     return { state: current, newlyOpened: false };
   }
-  const state = { opened: { ...current.opened, [day]: now.toISOString() } };
+  const state = { ...current, opened: { ...current.opened, [day]: now.toISOString() } };
   await saveState(hass, key, state);
   return { state, newlyOpened: true };
+}
+
+/** Setzt oder entfernt den „Erledigt“-Haken einer Aufgabe; liest vorher den aktuellen Stand. */
+export async function setTaskDone(
+  hass: HomeAssistant,
+  key: string,
+  day: number,
+  done: boolean,
+  now: Date,
+): Promise<CalendarState> {
+  const current = await loadState(hass, key);
+  if (isDone(current, day) === done) {
+    return current;
+  }
+  const doneMap = { ...current.done };
+  if (done) {
+    doneMap[day] = now.toISOString();
+  } else {
+    delete doneMap[day];
+  }
+  const state = { ...current, done: doneMap };
+  await saveState(hass, key, state);
+  return state;
 }
 
 export async function resetState(hass: HomeAssistant, key: string): Promise<CalendarState> {
