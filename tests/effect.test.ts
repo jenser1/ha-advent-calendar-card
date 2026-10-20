@@ -4,6 +4,8 @@ import {
   normalizeEffects,
   prepareCall,
   runEffects,
+  runSharedEffects,
+  sharedEffectMarker,
   validateEffect,
 } from '../src/blocks/effect';
 import { mockHass } from './mock-hass';
@@ -161,6 +163,74 @@ describe('runEffects', () => {
     const hass = mockHass();
     expect(normalizeEffects(undefined)).toEqual([]);
     expect(await runEffects(hass, undefined, vars)).toEqual([]);
+    expect(hass.serviceCalls).toEqual([]);
+  });
+});
+
+describe('gemeinsame Effekte einmal pro Tag', () => {
+  const HELPER = 'input_text.adventskalender';
+  const nikolaus = { action: 'script.advent_nikolaus' };
+  const once = { helper: HELPER, marker: sharedEffectMarker(2026, 6, false) };
+  const home = (helperState?: string) =>
+    mockHass({
+      services: ['script.advent_nikolaus', 'input_text.set_value'],
+      states: helperState === undefined ? {} : { [HELPER]: helperState },
+    });
+  const called = (hass: ReturnType<typeof mockHass>) =>
+    hass.serviceCalls.map((c) => `${c.domain}.${c.service}`);
+
+  it('bildet den Merker aus Datum und Testmodus', () => {
+    expect(sharedEffectMarker(2026, 6, false)).toBe('2026-12-06');
+    expect(sharedEffectMarker(2026, 24, true)).toBe('test:2026-12-24');
+  });
+
+  it('setzt zuerst den Merker und löst dann aus', async () => {
+    const hass = home('');
+    expect(await runSharedEffects(hass, nikolaus, vars, once)).toEqual([]);
+    expect(called(hass)).toEqual(['input_text.set_value', 'script.advent_nikolaus']);
+    expect(hass.serviceCalls[0]).toMatchObject({ data: { value: '2026-12-06' }, target: { entity_id: HELPER } });
+    expect(hass.states![HELPER].state).toBe('2026-12-06');
+  });
+
+  it('löst nicht aus, wenn der Merker für heute schon gesetzt ist', async () => {
+    const hass = home('2026-12-06');
+    expect(await runSharedEffects(hass, nikolaus, vars, once)).toEqual([]);
+    expect(hass.serviceCalls).toEqual([]);
+  });
+
+  it('lässt sich von einem Test-Merker nicht blockieren', async () => {
+    const hass = home('test:2026-12-06');
+    await runSharedEffects(hass, nikolaus, vars, once);
+    expect(called(hass)).toEqual(['input_text.set_value', 'script.advent_nikolaus']);
+  });
+
+  it('löst ohne Helfer bei jedem Aufruf aus', async () => {
+    const hass = home();
+    await runSharedEffects(hass, nikolaus, vars, { marker: once.marker });
+    await runSharedEffects(hass, nikolaus, vars, undefined);
+    expect(called(hass)).toEqual(['script.advent_nikolaus', 'script.advent_nikolaus']);
+  });
+
+  it('meldet einen fehlenden Helfer und löst trotzdem aus', async () => {
+    const hass = home();
+    expect(await runSharedEffects(hass, nikolaus, vars, once)).toEqual([
+      'Helfer „input_text.adventskalender“ gibt es nicht.',
+    ]);
+    expect(called(hass)).toEqual(['script.advent_nikolaus']);
+  });
+
+  it('meldet, wenn der Merker nicht gesetzt werden kann, und löst trotzdem aus', async () => {
+    const hass = home('');
+    hass.failService = 'input_text.set_value';
+    expect(await runSharedEffects(hass, nikolaus, vars, once)).toEqual([
+      'Helfer „input_text.adventskalender“: Unable to find referenced entities',
+    ]);
+    expect(called(hass)).toEqual(['input_text.set_value', 'script.advent_nikolaus']);
+  });
+
+  it('fasst den Helfer ohne gemeinsamen Effekt nicht an', async () => {
+    const hass = home('');
+    expect(await runSharedEffects(hass, undefined, vars, once)).toEqual([]);
     expect(hass.serviceCalls).toEqual([]);
   });
 });

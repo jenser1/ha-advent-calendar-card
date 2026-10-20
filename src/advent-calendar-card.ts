@@ -1,7 +1,13 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { state } from 'lit/decorators.js';
 import { version } from '../package.json';
-import { runEffects, type EffectVariables } from './blocks/effect';
+import {
+  normalizeEffects,
+  runEffects,
+  runSharedEffects,
+  setHelperValue,
+  sharedEffectMarker,
+} from './blocks/effect';
 import {
   DOOR_COUNT,
   daysUntilDoor,
@@ -16,7 +22,12 @@ import {
 } from './date-logic';
 import './door';
 import { DEFAULT_EMPTY_TEXT } from './door-dialog';
-import { findCalendar, validatePersonConfig, type CalendarMatch } from './persons';
+import {
+  findCalendar,
+  resolveDoor,
+  validatePersonConfig,
+  type CalendarMatch,
+} from './persons';
 import {
   isDone,
   isOpened,
@@ -26,10 +37,11 @@ import {
   resetState,
   setTaskDone,
   storageKey,
+  withTaskDone,
   type CalendarState,
 } from './storage';
 import { resolveTheme } from './themes';
-import type { AdventCalendarCardConfig, EffectConfig, HomeAssistant } from './types';
+import type { AdventCalendarCardConfig, HomeAssistant } from './types';
 
 export const CARD_TAG = 'advent-calendar-card';
 
@@ -209,7 +221,10 @@ export class AdventCalendarCard extends LitElement {
     if (!hass || !key || !before || !user || !this.config) {
       return;
     }
-    const match = findCalendar(this.config, user);
+    const config = this.config;
+    const match = findCalendar(config, user);
+    const year = this.year!;
+    const test = this.today!.debug;
     // Sofort anzeigen, Speichern läuft im Hintergrund.
     this.calendar = { ...before, opened: { ...before.opened, [day]: new Date().toISOString() } };
     try {
@@ -219,11 +234,19 @@ export class AdventCalendarCard extends LitElement {
       }
       // Erst nach Bestätigung durch den Server: So löst ein Türchen, das schon
       // auf einem anderen Gerät geöffnet wurde, den Effekt nicht noch einmal aus.
-      if (newlyOpened) {
-        void this.triggerEffects(hass, match?.calendar.doors?.[day]?.effect, {
-          tag: day,
-          person: match?.person ?? user.name,
-        });
+      if (newlyOpened && match) {
+        const door = resolveDoor(config, match.calendar, day);
+        const variables = { tag: day, person: match.person ?? user.name };
+        const once =
+          config.shared?.effect_once === false
+            ? undefined
+            : { helper: config.shared?.effect_helper, marker: sharedEffectMarker(year, day, test) };
+        void this.reportEffectErrors(
+          Promise.all([
+            runEffects(hass, door.personal?.effect, variables),
+            runSharedEffects(hass, door.shared?.effect, variables, once),
+          ]),
+        );
       }
     } catch (err) {
       console.error('[advent-calendar-card] Speichern fehlgeschlagen:', err);
@@ -234,20 +257,18 @@ export class AdventCalendarCard extends LitElement {
     }
   }
 
-  private async triggerEffects(
-    hass: HomeAssistant,
-    effect: EffectConfig | undefined,
-    variables: EffectVariables,
-  ): Promise<void> {
-    const errors = await runEffects(hass, effect, variables);
+  private async reportEffectErrors(results: Promise<string[][]>): Promise<void> {
+    const errors = (await results).flat();
     if (errors.length > 0) {
       console.warn('[advent-calendar-card] Effekt nicht möglich:', errors);
       this.toast(`Effekt nicht möglich: ${errors.join(' · ')}`);
     }
   }
 
-  private async onTaskToggle(event: CustomEvent<{ day: number; done: boolean }>): Promise<void> {
-    const { day, done } = event.detail;
+  private async onTaskToggle(
+    event: CustomEvent<{ day: number; done: boolean; shared: boolean }>,
+  ): Promise<void> {
+    const { day, done, shared } = event.detail;
     const hass = this._hass;
     const key = this.storageKey;
     const id = this.currentCalendarId;
@@ -255,15 +276,9 @@ export class AdventCalendarCard extends LitElement {
     if (!hass || !key || !before) {
       return;
     }
-    const doneMap = { ...before.done };
-    if (done) {
-      doneMap[day] = new Date().toISOString();
-    } else {
-      delete doneMap[day];
-    }
-    this.calendar = { ...before, done: doneMap };
+    this.calendar = withTaskDone(before, day, done, shared, new Date());
     try {
-      const state = await setTaskDone(hass, key, day, done, new Date());
+      const state = await setTaskDone(hass, key, day, done, new Date(), shared);
       if (id === this.currentCalendarId) {
         this.calendar = state;
       }
@@ -284,6 +299,11 @@ export class AdventCalendarCard extends LitElement {
     }
     try {
       this.calendar = await resetState(hass, key);
+      // Auch den Test-Merker für gemeinsame Effekte löschen (echte Merker bleiben).
+      const helper = this.config?.shared?.effect_helper;
+      if (helper && hass.states?.[helper]?.state.startsWith('test:')) {
+        await setHelperValue(hass, helper, '');
+      }
       this.toast('Testdaten zurückgesetzt.');
     } catch (err) {
       console.error('[advent-calendar-card] Zurücksetzen fehlgeschlagen:', err);
@@ -299,6 +319,28 @@ export class AdventCalendarCard extends LitElement {
         composed: true,
       }),
     );
+  }
+
+  /**
+   * Hinweis für Admins, wenn gemeinsame Effekte nicht „einmal pro Tag“ laufen können,
+   * weil kein Helfer eingetragen ist oder der eingetragene fehlt.
+   */
+  private sharedEffectNotice(): string | undefined {
+    const shared = this.config?.shared;
+    const hasSharedEffects = Object.values(shared?.doors ?? {}).some(
+      (door) => normalizeEffects(door?.effect).length > 0,
+    );
+    if (!shared || !hasSharedEffects || shared.effect_once === false) {
+      return undefined;
+    }
+    const helper = shared.effect_helper;
+    if (!helper) {
+      return 'ℹ️ Gemeinsame Effekte laufen bei jeder Person einmal. Für „einmal pro Tag“ einen Text-Helfer anlegen und als shared.effect_helper eintragen.';
+    }
+    if (this._hass?.states && !this._hass.states[helper]) {
+      return `⚠️ Den Helfer „${helper}“ gibt es nicht – gemeinsame Effekte laufen bei jeder Person.`;
+    }
+    return undefined;
   }
 
   render() {
@@ -328,6 +370,8 @@ export class AdventCalendarCard extends LitElement {
     const theme = resolveTheme(match.calendar.theme, this.config.theme);
     const days = Array.from({ length: DOOR_COUNT }, (_, i) => i + 1);
     const openDay = this.openDay;
+    const door = openDay === undefined ? {} : resolveDoor(this.config, match.calendar, openDay);
+    const notice = user?.is_admin ? this.sharedEffectNotice() : undefined;
 
     return html`
       <ha-card class="theme-${theme}">
@@ -346,6 +390,7 @@ export class AdventCalendarCard extends LitElement {
         ${this.loadFailed
           ? html`<div class="error">Gespeicherter Stand konnte nicht geladen werden.</div>`
           : nothing}
+        ${notice ? html`<div class="notice">${notice}</div>` : nothing}
         <div class="doors">
           ${days.map((day) => {
             const status = calendar
@@ -366,9 +411,11 @@ export class AdventCalendarCard extends LitElement {
         <advent-calendar-dialog
           .open=${openDay !== undefined}
           .day=${openDay ?? 0}
-          .content=${openDay === undefined ? null : (match.calendar.doors?.[openDay] ?? null)}
+          .content=${door.personal ?? null}
+          .sharedContent=${door.shared ?? null}
           .emptyText=${this.config.empty_text ?? DEFAULT_EMPTY_TEXT}
           .taskDone=${!!calendar && openDay !== undefined && isDone(calendar, openDay)}
+          .sharedTaskDone=${!!calendar && openDay !== undefined && isDone(calendar, openDay, true)}
           @dialog-closed=${() => (this.openDay = undefined)}
           @task-toggle=${this.onTaskToggle}
         ></advent-calendar-dialog>
@@ -386,11 +433,17 @@ export class AdventCalendarCard extends LitElement {
     }
 
     .debug,
-    .error {
+    .error,
+    .notice {
       margin: 0 16px 12px;
       padding: 6px 10px;
       border-radius: 8px;
       font-size: 0.9em;
+    }
+
+    .notice {
+      background: var(--secondary-background-color, #f2f2f2);
+      color: var(--primary-text-color);
     }
 
     .debug {
@@ -422,7 +475,8 @@ export class AdventCalendarCard extends LitElement {
     }
 
     .debug:first-child,
-    .error:first-child {
+    .error:first-child,
+    .notice:first-child {
       margin-top: 16px;
     }
 
@@ -435,7 +489,8 @@ export class AdventCalendarCard extends LitElement {
 
     .card-header + .doors,
     .debug + .doors,
-    .error + .doors {
+    .error + .doors,
+    .notice + .doors {
       padding-top: 0;
     }
 

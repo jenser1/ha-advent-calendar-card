@@ -34,6 +34,8 @@ export function mockHass(
     services?: string[];
     /** Vorhandene Entitäten, z. B. ['script.advent_lichtshow'] */
     entities?: string[];
+    /** Entitäten mit Zustand, z. B. { 'input_text.adventskalender': '' } */
+    states?: Record<string, string>;
   } = {},
 ): MockHass {
   const services: Record<string, Record<string, unknown>> = {};
@@ -50,7 +52,10 @@ export function mockHass(
     },
     config: { time_zone: options.timeZone ?? 'Europe/Berlin' },
     language: 'de',
-    states: Object.fromEntries((options.entities ?? []).map((id) => [id, { entity_id: id }])),
+    states: Object.fromEntries([
+      ...(options.entities ?? []).map((id) => [id, { state: 'off' }]),
+      ...Object.entries(options.states ?? {}).map(([id, state]) => [id, { state }]),
+    ]),
     services,
     userData: new Map(Object.entries(options.userData ?? {})),
     calls: [],
@@ -61,6 +66,11 @@ export function mockHass(
       hass.serviceCalls.push({ domain, service, data, target, notifyOnError });
       if (hass.failService === `${domain}.${service}`) {
         throw new Error('Unable to find referenced entities');
+      }
+      // Wie in HA: input_text.set_value ändert den Zustand des Helfers.
+      const entityId = target?.entity_id;
+      if (domain === 'input_text' && service === 'set_value' && typeof entityId === 'string') {
+        hass.states = { ...hass.states, [entityId]: { state: String(data?.value ?? '') } };
       }
       return undefined;
     },

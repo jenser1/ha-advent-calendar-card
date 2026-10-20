@@ -11,16 +11,23 @@ export const DEFAULT_EMPTY_TEXT = 'Heute ist das Türchen leer – schön, dass 
  * Modal mit dem Inhalt eines Türchens. Nutzt das native <dialog>-Element statt
  * HA-interner Komponenten, damit es über HA-Versionen hinweg stabil bleibt.
  *
- * Events: `dialog-closed`, `task-toggle` (detail: { day, done }).
+ * Events: `dialog-closed`, `task-toggle` (detail: { day, done, shared }).
  */
+type Section = 'shared' | 'personal';
+
 export class AdventCalendarDialog extends LitElement {
   @property({ type: Boolean }) open = false;
   @property({ type: Number }) day = 0;
+  /** Persönlicher Inhalt. */
   @property({ attribute: false }) content?: DoorContent | null;
+  /** Gemeinsamer Inhalt (shared). */
+  @property({ attribute: false }) sharedContent?: DoorContent | null;
   @property({ attribute: false }) emptyText = DEFAULT_EMPTY_TEXT;
   @property({ type: Boolean }) taskDone = false;
+  @property({ type: Boolean }) sharedTaskDone = false;
 
-  @state() private answerRevealed = false;
+  /** Abschnitte, deren Rätsel-Lösung schon aufgedeckt ist. */
+  @state() private revealed: ReadonlySet<Section> = new Set();
 
   @query('dialog') private dialog?: HTMLDialogElement;
 
@@ -79,6 +86,15 @@ export class AdventCalendarDialog extends LitElement {
         background: var(--secondary-background-color, #f2f2f2);
       }
 
+      .section {
+        margin: 4px 0 -6px;
+        font-size: 0.85em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--secondary-text-color, #727272);
+      }
+
       .empty {
         margin: 0;
         font-size: 1.1em;
@@ -90,7 +106,7 @@ export class AdventCalendarDialog extends LitElement {
 
   protected willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('day') || (changed.has('open') && !this.open)) {
-      this.answerRevealed = false;
+      this.revealed = new Set();
     }
   }
 
@@ -120,14 +136,25 @@ export class AdventCalendarDialog extends LitElement {
     }
   }
 
-  private onToggleTask(): void {
+  private onToggleTask(section: Section): void {
+    const shared = section === 'shared';
     this.dispatchEvent(
       new CustomEvent('task-toggle', {
-        detail: { day: this.day, done: !this.taskDone },
+        detail: { day: this.day, done: !(shared ? this.sharedTaskDone : this.taskDone), shared },
         bubbles: true,
         composed: true,
       }),
     );
+  }
+
+  private renderSection(section: Section, content: DoorContent) {
+    return renderBlocks(content, {
+      day: this.day,
+      answerRevealed: this.revealed.has(section),
+      taskDone: section === 'shared' ? this.sharedTaskDone : this.taskDone,
+      onReveal: () => (this.revealed = new Set(this.revealed).add(section)),
+      onToggleTask: () => this.onToggleTask(section),
+    });
   }
 
   render() {
@@ -144,22 +171,21 @@ export class AdventCalendarDialog extends LitElement {
 
   // Inhalt nur bei offenem Dialog rendern: Beim Schließen verschwinden so auch laufende Videos.
   private renderInner() {
-    const content = this.content;
+    const shared = hasVisibleContent(this.sharedContent) ? this.sharedContent! : undefined;
+    const personal = hasVisibleContent(this.content) ? this.content! : undefined;
+    // Überschriften nur, wenn beide Teile etwas zeigen; gemeinsamer Inhalt kommt zuerst.
+    const both = !!shared && !!personal;
     return html`
       <div class="inner">
         <header>
           <h2 id="title">Türchen ${this.day}</h2>
           <button class="close" aria-label="Schließen" @click=${this.requestClose}>✕</button>
         </header>
-        ${hasVisibleContent(content)
-          ? renderBlocks(content!, {
-              day: this.day,
-              answerRevealed: this.answerRevealed,
-              taskDone: this.taskDone,
-              onReveal: () => (this.answerRevealed = true),
-              onToggleTask: () => this.onToggleTask(),
-            })
-          : html`<p class="empty">${this.emptyText}</p>`}
+        ${both ? html`<h3 class="section">🎄 Für alle</h3>` : nothing}
+        ${shared ? this.renderSection('shared', shared) : nothing}
+        ${both ? html`<h3 class="section">Für dich</h3>` : nothing}
+        ${personal ? this.renderSection('personal', personal) : nothing}
+        ${!shared && !personal ? html`<p class="empty">${this.emptyText}</p>` : nothing}
       </div>
     `;
   }

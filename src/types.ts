@@ -12,7 +12,7 @@ export interface HomeAssistant {
   };
   language: string;
   /** Zustände aller Entitäten, Schlüssel ist die entity_id. */
-  states?: Record<string, unknown>;
+  states?: Record<string, { state: string }>;
   /** Verfügbare Dienste: domain → service → Beschreibung. */
   services?: Record<string, Record<string, unknown>>;
   callService(
@@ -45,6 +45,29 @@ export interface AdventCalendarCardConfig {
   users?: Record<string, PersonConfig | null>;
   /** Kalender für alle ohne eigenen Eintrag in `users`. */
   fallback?: CalendarConfig | null;
+  /** Gemeinsame Türchen für alle Personen. */
+  shared?: SharedConfig | null;
+}
+
+/**
+ * off: nur persönliche Inhalte; merge: gemeinsamer Inhalt zusätzlich zum persönlichen;
+ * replace: alle sehen nur den gemeinsamen Inhalt.
+ */
+export type SharedMode = 'off' | 'merge' | 'replace';
+
+export interface SharedConfig {
+  /** Standard: merge */
+  mode?: SharedMode;
+  /** Gemeinsamer Effekt nur einmal pro Tag (Standard: true); braucht effect_helper. */
+  effect_once?: boolean;
+  /** input_text-Helfer, in dem sich die Karte merkt, dass der Effekt heute schon lief. */
+  effect_helper?: string;
+  doors?: Record<number, SharedDoorContent | null> | null;
+}
+
+export interface SharedDoorContent extends DoorContent {
+  /** Überschreibt shared.mode für dieses Türchen. */
+  mode?: SharedMode;
 }
 
 export type LinkKind = 'github' | 'video' | 'shop' | 'web';

@@ -194,6 +194,7 @@ describe('Speicherung', () => {
       version: 1,
       opened: { 5: '2026-12-05T12:00:00.000Z' },
       done: {},
+      shared_done: {},
     });
   });
 
@@ -338,6 +339,7 @@ describe('Testmodus und Speicherung', () => {
       version: 1,
       opened: { 5: '2026-10-17T10:00:00.000Z' },
       done: {},
+      shared_done: {},
     });
     expect(hass.userData.get(KEY)).toEqual({ version: 1, opened: {} });
   });
@@ -359,7 +361,12 @@ describe('Testmodus und Speicherung', () => {
     await settle(card);
 
     expect(statuses(card)[4]).toBe('openable');
-    expect(hass.userData.get(TEST_KEY)).toEqual({ version: 1, opened: {}, done: {} });
+    expect(hass.userData.get(TEST_KEY)).toEqual({
+      version: 1,
+      opened: {},
+      done: {},
+      shared_done: {},
+    });
     expect(hass.userData.get(KEY)).toEqual({ version: 1, opened: { 1: 'echt' } });
     expect(messages).toEqual(['Testdaten zurückgesetzt.']);
   });

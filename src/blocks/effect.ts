@@ -126,6 +126,56 @@ export function findMissing(call: PreparedCall, hass: HomeAssistant): string | u
 }
 
 /**
+ * Wert, den der Helfer für „gemeinsamer Effekt von Türchen X lief schon“ bekommt,
+ * z. B. „2026-12-06“; im Testmodus „test:2026-12-06“, damit Tests den echten Tag nicht blockieren.
+ */
+export function sharedEffectMarker(year: number, day: number, test: boolean): string {
+  return `${test ? 'test:' : ''}${year}-12-${String(day).padStart(2, '0')}`;
+}
+
+export async function setHelperValue(
+  hass: HomeAssistant,
+  helper: string,
+  value: string,
+): Promise<void> {
+  await hass.callService('input_text', 'set_value', { value }, { entity_id: helper }, false);
+}
+
+/**
+ * Löst einen gemeinsamen Effekt höchstens einmal aus: Steht der Merker schon im
+ * Helfer, passiert nichts; sonst wird er zuerst gesetzt und dann ausgelöst.
+ * Ohne Helfer läuft der Effekt bei jeder Person (wie effect_once: false).
+ * Öffnen zwei Personen im selben Moment, kann er trotzdem doppelt laufen.
+ */
+export async function runSharedEffects(
+  hass: HomeAssistant,
+  effect: EffectConfig | undefined,
+  variables: EffectVariables,
+  once: { helper?: string; marker: string } | undefined,
+): Promise<string[]> {
+  if (normalizeEffects(effect).length === 0) {
+    return [];
+  }
+  const errors: string[] = [];
+  if (once?.helper) {
+    const current = hass.states?.[once.helper];
+    if (!current) {
+      errors.push(`Helfer „${once.helper}“ gibt es nicht.`);
+    } else if (current.state === once.marker) {
+      return [];
+    } else {
+      try {
+        await setHelperValue(hass, once.helper, once.marker);
+      } catch (err) {
+        const message = isRecord(err) && typeof err.message === 'string' ? err.message : String(err);
+        errors.push(`Helfer „${once.helper}“: ${message}`);
+      }
+    }
+  }
+  return [...errors, ...(await runEffects(hass, effect, variables))];
+}
+
+/**
  * Löst alle Effekte gleichzeitig aus (direkt aufgerufene Scripts laufen sonst
  * nacheinander, weil HA erst nach ihrem Ende antwortet). Liefert Fehlermeldungen.
  */

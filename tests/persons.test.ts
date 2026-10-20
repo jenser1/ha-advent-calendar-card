@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findCalendar, validatePersonConfig } from '../src/persons';
+import { findCalendar, resolveDoor, validatePersonConfig } from '../src/persons';
 import { resolveTheme } from '../src/themes';
 import type { AdventCalendarCardConfig } from '../src/types';
 
@@ -128,5 +128,92 @@ describe('validatePersonConfig', () => {
     expect(invalid({ users: { jens: { doors: { 1: 'Hallo' } } } })).toThrow(
       /„users\.jens\.doors\.1“ muss Inhalte/,
     );
+  });
+});
+
+describe('resolveDoor (gemeinsame Türchen)', () => {
+  const personal = { doors: { 6: { text: 'Für Jens' }, 7: { text: 'Nur Jens' } } };
+  const withShared = (shared: AdventCalendarCardConfig['shared']) => config({ shared });
+
+  it('führt im Standard-Modus merge beides zusammen', () => {
+    const cfg = withShared({ doors: { 6: { text: 'Für alle' } } });
+    expect(resolveDoor(cfg, personal, 6)).toEqual({
+      personal: { text: 'Für Jens' },
+      shared: { text: 'Für alle' },
+    });
+    expect(resolveDoor(cfg, personal, 7)).toEqual({ personal: { text: 'Nur Jens' } });
+  });
+
+  it('zeigt bei replace nur den gemeinsamen Inhalt', () => {
+    const cfg = withShared({ mode: 'replace', doors: { 6: { text: 'Für alle' } } });
+    expect(resolveDoor(cfg, personal, 6)).toEqual({ shared: { text: 'Für alle' } });
+  });
+
+  it('ignoriert gemeinsame Türchen bei off', () => {
+    const cfg = withShared({ mode: 'off', doors: { 6: { text: 'Für alle' } } });
+    expect(resolveDoor(cfg, personal, 6)).toEqual({ personal: { text: 'Für Jens' } });
+  });
+
+  it('lässt einzelne Türchen den Modus überschreiben und entfernt mode aus dem Inhalt', () => {
+    const cfg = withShared({
+      mode: 'merge',
+      doors: {
+        6: { mode: 'replace', text: 'Nikolaus für alle' },
+        7: { mode: 'off', text: 'heute nicht' },
+      },
+    });
+    expect(resolveDoor(cfg, personal, 6)).toEqual({ shared: { text: 'Nikolaus für alle' } });
+    expect(resolveDoor(cfg, personal, 7)).toEqual({ personal: { text: 'Nur Jens' } });
+
+    const globalOff = withShared({ mode: 'off', doors: { 24: { mode: 'merge', text: 'Heiligabend' } } });
+    expect(resolveDoor(globalOff, {}, 24)).toEqual({ personal: undefined, shared: { text: 'Heiligabend' } });
+  });
+
+  it('kommt ohne shared und mit leeren Einträgen klar', () => {
+    expect(resolveDoor(config({}), personal, 6)).toEqual({ personal: { text: 'Für Jens' } });
+    expect(resolveDoor(withShared({ doors: { 6: null } }), {}, 6)).toEqual({ personal: undefined });
+  });
+});
+
+describe('validatePersonConfig: shared', () => {
+  const check = (shared: unknown) => () =>
+    validatePersonConfig({ type: TYPE, shared } as AdventCalendarCardConfig);
+
+  it('akzeptiert eine vollständige Konfiguration', () => {
+    expect(
+      check({
+        mode: 'merge',
+        effect_once: true,
+        effect_helper: 'input_text.adventskalender',
+        doors: {
+          6: { mode: 'replace', text: 'Nikolaus!', effect: { action: 'script.advent_nikolaus' } },
+          24: null,
+        },
+      }),
+    ).not.toThrow();
+    expect(check(null)).not.toThrow();
+  });
+
+  it('meldet falsche Einstellungen', () => {
+    expect(check('merge')).toThrow(/„shared“ muss Einstellungen/);
+    expect(check({ modus: 'merge' })).toThrow(/„shared\.modus“ gibt es nicht/);
+    expect(check({ mode: 'mix' })).toThrow(/„shared\.mode“ muss eines davon sein: off, merge, replace/);
+    expect(check({ effect_once: 'ja' })).toThrow(/„shared\.effect_once“ muss true oder false/);
+    expect(check({ effect_helper: 'input_boolean.x' })).toThrow(/„shared\.effect_helper“ muss ein Text-Helfer/);
+  });
+
+  it('prüft gemeinsame Türchen wie persönliche, inklusive mode', () => {
+    expect(check({ doors: { 6: { mode: 'alle' } } })).toThrow(/„shared\.doors\.6\.mode“/);
+    expect(check({ doors: { 25: {} } })).toThrow(/„shared\.doors“: „25“ ist kein Türchen/);
+    expect(check({ doors: { 6: { txt: 'x' } } })).toThrow(/„shared\.doors\.6\.txt“ gibt es nicht/);
+  });
+
+  it('erlaubt mode nur in gemeinsamen Türchen', () => {
+    expect(() =>
+      validatePersonConfig({
+        type: TYPE,
+        users: { jens: { doors: { 6: { mode: 'replace' } as never } } },
+      }),
+    ).toThrow(/„users\.jens\.doors\.6\.mode“ gibt es nicht/);
   });
 });

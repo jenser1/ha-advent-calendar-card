@@ -7,6 +7,8 @@ export interface CalendarState {
   opened: Record<number, string>;
   /** Tag → Zeitpunkt, an dem die Aufgabe/der Gutschein als erledigt markiert wurde. */
   done: Record<number, string>;
+  /** Wie `done`, aber für die Aufgabe eines gemeinsamen Türchens. */
+  sharedDone: Record<number, string>;
 }
 
 const STORAGE_VERSION = 1;
@@ -21,7 +23,7 @@ export function storageKey(year: number, test: boolean): string {
 }
 
 export function emptyState(): CalendarState {
-  return { opened: {}, done: {} };
+  return { opened: {}, done: {}, sharedDone: {} };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -47,15 +49,19 @@ export function parseStoredState(value: unknown): CalendarState {
   if (!isRecord(value)) {
     return emptyState();
   }
-  return { opened: parseDayMap(value.opened), done: parseDayMap(value.done) };
+  return {
+    opened: parseDayMap(value.opened),
+    done: parseDayMap(value.done),
+    sharedDone: parseDayMap(value.shared_done),
+  };
 }
 
 export function isOpened(state: CalendarState, day: number): boolean {
   return day in state.opened;
 }
 
-export function isDone(state: CalendarState, day: number): boolean {
-  return day in state.done;
+export function isDone(state: CalendarState, day: number, shared = false): boolean {
+  return day in (shared ? state.sharedDone : state.done);
 }
 
 export function openedCount(state: CalendarState): number {
@@ -78,7 +84,12 @@ export async function saveState(
   await hass.callWS({
     type: 'frontend/set_user_data',
     key,
-    value: { version: STORAGE_VERSION, opened: state.opened, done: state.done },
+    value: {
+      version: STORAGE_VERSION,
+      opened: state.opened,
+      done: state.done,
+      shared_done: state.sharedDone,
+    },
   });
 }
 
@@ -102,25 +113,41 @@ export async function markOpened(
   return { state, newlyOpened: true };
 }
 
-/** Setzt oder entfernt den „Erledigt“-Haken einer Aufgabe; liest vorher den aktuellen Stand. */
+/** Gibt `state` mit gesetztem bzw. entferntem Erledigt-Haken zurück. */
+export function withTaskDone(
+  state: CalendarState,
+  day: number,
+  done: boolean,
+  shared: boolean,
+  now: Date,
+): CalendarState {
+  const field = shared ? 'sharedDone' : 'done';
+  const map = { ...state[field] };
+  if (done) {
+    map[day] = now.toISOString();
+  } else {
+    delete map[day];
+  }
+  return { ...state, [field]: map };
+}
+
+/**
+ * Setzt oder entfernt den „Erledigt“-Haken einer Aufgabe (persönlich oder gemeinsam);
+ * liest vorher den aktuellen Stand.
+ */
 export async function setTaskDone(
   hass: HomeAssistant,
   key: string,
   day: number,
   done: boolean,
   now: Date,
+  shared = false,
 ): Promise<CalendarState> {
   const current = await loadState(hass, key);
-  if (isDone(current, day) === done) {
+  if (isDone(current, day, shared) === done) {
     return current;
   }
-  const doneMap = { ...current.done };
-  if (done) {
-    doneMap[day] = now.toISOString();
-  } else {
-    delete doneMap[day];
-  }
-  const state = { ...current, done: doneMap };
+  const state = withTaskDone(current, day, done, shared, now);
   await saveState(hass, key, state);
   return state;
 }

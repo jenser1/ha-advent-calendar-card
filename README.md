@@ -47,6 +47,7 @@ year: 2026
 | `users`      | Personen           | –                        | Ein Kalender pro Person (siehe Personen)            |
 | `fallback`   | Kalender           | –                        | Für alle ohne eigenen Eintrag in `users`            |
 | `empty_text` | Text               | „Heute ist das Türchen leer …“ | Text für Türchen ohne Inhalt                  |
+| `shared`     | gemeinsame Türchen | –                        | Türchen für alle (siehe Gemeinsame Türchen)         |
 
 Weitere Optionen folgen mit den nächsten Versionen.
 
@@ -151,6 +152,39 @@ doors:
 - Effekte laufen über `hass.callService` mit den Rechten des angemeldeten Benutzers. Scripts dürfen auch Nicht-Admins starten.
 - Beispiel-Scripts für Lichtshow, Weihnachtsmusik und Nikolaus stehen in [`examples/scripts.yaml`](examples/scripts.yaml).
 - Tipp: Schreib zu einem Effekt einen `text` dazu – sonst zeigt der Dialog `empty_text`.
+
+### Gemeinsame Türchen
+
+Unter `shared` stehen Türchen, die alle Personen sehen – zusätzlich zum persönlichen Inhalt oder stattdessen:
+
+```yaml
+shared:
+  mode: merge                         # off | merge | replace (Standard: merge)
+  effect_helper: input_text.adventskalender
+  doors:
+    6:
+      mode: replace                   # nur für dieses Türchen
+      text: "Nikolaus! Alle zusammen Stiefel checken 🥾"
+      effect:
+        action: script.advent_nikolaus
+    24:
+      text: "Frohe Weihnachten! 🎄"
+```
+
+| `mode`    | Was alle sehen                                                                  |
+| --------- | ------------------------------------------------------------------------------- |
+| `off`     | nur ihre persönlichen Türchen                                                   |
+| `merge`   | erst „🎄 Für alle“ mit dem gemeinsamen Inhalt, darunter „Für dich“               |
+| `replace` | nur den gemeinsamen Inhalt; persönlicher Inhalt und Effekt fallen an dem Tag weg |
+
+`mode` gilt für alle gemeinsamen Türchen und lässt sich pro Türchen überschreiben. Ob ein Türchen geöffnet ist und ob eine Aufgabe erledigt ist, bleibt pro Person getrennt. Gemeinsame Türchen sieht jeder, der einen Kalender hat – für Gäste reicht `fallback: {}`.
+
+**Gemeinsamer Effekt nur einmal pro Tag:** Der Effekt eines gemeinsamen Türchens soll nur bei der ersten Person laufen, nicht bei jeder. Dafür merkt sich die Karte den Tag in einem Text-Helfer:
+
+1. **Einstellungen → Geräte & Dienste → Helfer → Helfer erstellen → Text**, z. B. „Adventskalender“ → `input_text.adventskalender`
+2. In der Karte `shared.effect_helper: input_text.adventskalender` eintragen.
+
+Ohne Helfer läuft der gemeinsame Effekt bei jeder Person einmal; Admins sehen dazu einen Hinweis in der Karte. Mit `shared.effect_once: false` ist das gewollt und der Hinweis verschwindet. Öffnen zwei Personen im selben Moment, kann der Effekt trotzdem doppelt laufen. Im Testmodus schreibt die Karte `test:…` in den Helfer, damit Tests den echten Tag nicht blockieren; **Testdaten zurücksetzen** löscht diesen Test-Merker.
 
 ### Wann sich ein Türchen öffnen lässt
 

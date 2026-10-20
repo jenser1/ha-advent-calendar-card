@@ -54,13 +54,22 @@ describe('parseStoredState', () => {
 describe('Laden und Speichern', () => {
   it('nutzt frontend/get_user_data und frontend/set_user_data', async () => {
     const hass = mockHass();
-    const state = { opened: { 2: '2026-12-02T09:00:00Z' }, done: { 2: '2026-12-02T10:00:00Z' } };
+    const state = {
+      opened: { 2: '2026-12-02T09:00:00Z' },
+      done: { 2: '2026-12-02T10:00:00Z' },
+      sharedDone: { 2: '2026-12-02T11:00:00Z' },
+    };
     await saveState(hass, KEY, state);
 
     expect(hass.calls[0]).toEqual({
       type: 'frontend/set_user_data',
       key: KEY,
-      value: { version: 1, ...state },
+      value: {
+        version: 1,
+        opened: state.opened,
+        done: state.done,
+        shared_done: state.sharedDone,
+      },
     });
     expect(await loadState(hass, KEY)).toEqual(state);
     expect(hass.calls[1]).toEqual({ type: 'frontend/get_user_data', key: KEY });
@@ -118,12 +127,28 @@ describe('setTaskDone', () => {
     const hass = mockHass({ userData: { [KEY]: { version: 1, opened: { 5: 'a' } } } });
 
     const done = await setTaskDone(hass, KEY, 5, true, NOW);
-    expect(done).toEqual({ opened: { 5: 'a' }, done: { 5: '2026-12-05T08:15:00.000Z' } });
+    expect(done).toEqual({
+      opened: { 5: 'a' },
+      done: { 5: '2026-12-05T08:15:00.000Z' },
+      sharedDone: {},
+    });
     expect(await loadState(hass, KEY)).toEqual(done);
 
     const undone = await setTaskDone(hass, KEY, 5, false, NOW);
-    expect(undone).toEqual({ opened: { 5: 'a' }, done: {} });
+    expect(undone).toEqual({ opened: { 5: 'a' }, done: {}, sharedDone: {} });
     expect(await loadState(hass, KEY)).toEqual(undone);
+  });
+
+  it('trennt persönliche und gemeinsame Aufgaben am selben Tag', async () => {
+    const hass = mockHass({ userData: { [KEY]: { version: 1, opened: { 6: 'a' } } } });
+
+    const state = await setTaskDone(hass, KEY, 6, true, NOW, true);
+
+    expect(state.sharedDone).toEqual({ 6: '2026-12-05T08:15:00.000Z' });
+    expect(state.done).toEqual({});
+    expect(isDone(state, 6, true)).toBe(true);
+    expect(isDone(state, 6)).toBe(false);
+    expect(hass.userData.get(KEY)).toMatchObject({ shared_done: { 6: '2026-12-05T08:15:00.000Z' } });
   });
 
   it('speichert nicht, wenn sich nichts ändert', async () => {
