@@ -1,8 +1,13 @@
 import { LitElement, css, html, nothing } from 'lit';
-import { property } from 'lit/decorators.js';
+import { property, state } from 'lit/decorators.js';
 import type { DoorStatus } from './date-logic';
+import { prefersReducedMotion } from './themes';
 
 export const DOOR_TAG = 'advent-calendar-door';
+
+/** Dauer der Aufklapp-Animation; danach öffnet die Karte den Dialog. */
+export const OPEN_ANIMATION_MS = 700;
+const WOBBLE_MS = 450;
 
 const STATUS_LABELS: Record<DoorStatus, string> = {
   locked: 'noch gesperrt',
@@ -11,11 +16,47 @@ const STATUS_LABELS: Record<DoorStatus, string> = {
   missed: 'verpasst',
 };
 
-/** Ein einzelnes Türchen im Kalender. */
+/**
+ * Ein einzelnes Türchen: Innen (sichtbar, wenn geöffnet) und davor der Türflügel,
+ * der beim Öffnen in 3D aufklappt. Farben kommen aus den --advent-*-Variablen des Themes.
+ */
 export class AdventCalendarDoor extends LitElement {
   @property({ type: Number }) day = 0;
   /** Ohne Status (Stand noch nicht geladen) wird das Türchen neutral und nicht klickbar angezeigt. */
   @property() status?: DoorStatus;
+
+  @state() private effect?: 'wobble' | 'opening';
+  private effectTimer?: number;
+
+  /** Wackeln, z. B. wenn ein gesperrtes Türchen angetippt wird. */
+  wobble(): void {
+    void this.play('wobble', WOBBLE_MS);
+  }
+
+  /** Aufklappen; der Status wechselt parallel auf „opened“. */
+  playOpening(): void {
+    void this.play('opening', OPEN_ANIMATION_MS);
+  }
+
+  private async play(effect: 'wobble' | 'opening', duration: number): Promise<void> {
+    if (prefersReducedMotion()) {
+      return;
+    }
+    window.clearTimeout(this.effectTimer);
+    if (this.effect) {
+      // Läuft schon eine Animation: Klasse kurz entfernen und Layout erzwingen, damit sie neu startet.
+      this.effect = undefined;
+      await this.updateComplete;
+      this.shadowRoot?.querySelector('.door')?.getBoundingClientRect();
+    }
+    this.effect = effect;
+    this.effectTimer = window.setTimeout(() => (this.effect = undefined), duration);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    window.clearTimeout(this.effectTimer);
+  }
 
   static styles = css`
     :host {
@@ -25,24 +66,18 @@ export class AdventCalendarDoor extends LitElement {
     .door {
       container-type: inline-size;
       position: relative;
+      display: block;
       width: 100%;
       aspect-ratio: 1;
-      display: grid;
-      place-items: center;
-      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      border-radius: 12px;
-      border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-      background: linear-gradient(
-        145deg,
-        var(--secondary-background-color, #f2f2f2),
-        var(--card-background-color, #fff)
-      );
-      color: var(--primary-color, #b71c1c);
+      border: none;
+      border-radius: var(--advent-radius, 12px);
+      background: none;
       font: inherit;
+      color: inherit;
       cursor: pointer;
-      user-select: none;
+      perspective: 600px;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -51,22 +86,66 @@ export class AdventCalendarDoor extends LitElement {
     }
 
     .door:focus-visible {
-      outline: 2px solid var(--primary-color, #b71c1c);
-      outline-offset: 2px;
+      outline: 2px solid var(--advent-accent, var(--primary-color, #03a9f4));
+      outline-offset: 3px;
+    }
+
+    .inside,
+    .leaf {
+      position: absolute;
+      inset: 0;
+      box-sizing: border-box;
+      border-radius: inherit;
+      display: grid;
+      place-items: center;
+    }
+
+    .inside {
+      align-content: center;
+      gap: 2%;
+      background: var(--advent-inside, rgba(0, 0, 0, 0.25));
+      box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.45);
+      color: var(--advent-accent, var(--primary-color, #03a9f4));
+    }
+
+    .inside-number {
+      font-family: var(--advent-font, inherit);
+      font-size: 26cqi;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .inside-check {
+      font-size: 20cqi;
+      line-height: 1;
+    }
+
+    .leaf {
+      background: var(
+        --advent-door-bg,
+        linear-gradient(145deg, var(--secondary-background-color, #f2f2f2), var(--card-background-color, #fff))
+      );
+      border: 1px solid var(--advent-door-border, var(--divider-color, rgba(0, 0, 0, 0.12)));
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+      color: var(--advent-number, var(--primary-color, #03a9f4));
+      transform-origin: left center;
     }
 
     .number {
-      font-size: 40cqi;
+      font-family: var(--advent-font, inherit);
+      font-size: var(--advent-number-size, 40cqi);
       font-weight: 700;
       line-height: 1;
+      text-shadow: var(--advent-number-shadow, none);
     }
 
     .badge {
       position: absolute;
       top: 6%;
       right: 8%;
-      font-size: 16cqi;
+      font-size: 15cqi;
       line-height: 1;
+      opacity: 0.75;
     }
 
     .note {
@@ -77,50 +156,106 @@ export class AdventCalendarDoor extends LitElement {
       font-size: 11cqi;
       line-height: 1.1;
       text-align: center;
-      color: var(--secondary-text-color, #727272);
+      color: inherit;
     }
 
-    .locked .badge {
-      opacity: 0.6;
-    }
-
-    .openable {
-      border: 2px solid var(--primary-color, #b71c1c);
-      box-shadow: 0 0 12px var(--primary-color, #b71c1c);
+    .openable .leaf {
+      border: 2px solid var(--advent-accent, var(--primary-color, #03a9f4));
+      animation: advent-pulse 2.2s ease-in-out infinite;
     }
 
     .openable .note {
-      color: var(--primary-color, #b71c1c);
       font-weight: 700;
     }
 
-    .opened {
-      background: var(--secondary-background-color, #f2f2f2);
-      background: color-mix(
-        in srgb,
-        var(--primary-color, #b71c1c) 18%,
-        var(--card-background-color, #fff)
-      );
+    /* Geöffnet: Der Flügel steht schräg offen, dahinter das Innere mit ✔. */
+    .opened .leaf {
+      transform: rotateY(-72deg);
+      box-shadow: none;
+    }
+
+    .opening .leaf {
+      animation: advent-open 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+    }
+
+    .wobble .leaf {
+      animation: advent-wobble 0.45s ease-in-out;
     }
 
     .missed {
       cursor: default;
+    }
+
+    .missed .leaf {
       opacity: 0.45;
       filter: grayscale(1);
+    }
+
+    @keyframes advent-pulse {
+      0%,
+      100% {
+        box-shadow: 0 0 4px var(--advent-accent, var(--primary-color, #03a9f4));
+      }
+      50% {
+        box-shadow: 0 0 18px var(--advent-accent, var(--primary-color, #03a9f4));
+      }
+    }
+
+    @keyframes advent-open {
+      from {
+        transform: rotateY(0deg);
+      }
+      to {
+        transform: rotateY(-72deg);
+      }
+    }
+
+    @keyframes advent-wobble {
+      0%,
+      100% {
+        transform: rotate(0deg);
+      }
+      20% {
+        transform: rotate(-5deg);
+      }
+      40% {
+        transform: rotate(4deg);
+      }
+      60% {
+        transform: rotate(-3deg);
+      }
+      80% {
+        transform: rotate(2deg);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .leaf {
+        animation: none !important;
+      }
     }
   `;
 
   render() {
+    const status = this.status;
     return html`
       <button
-        class="door ${this.status ?? ''}"
-        ?disabled=${!this.status}
-        aria-label=${this.status
-          ? `Türchen ${this.day}, ${STATUS_LABELS[this.status]}`
-          : `Türchen ${this.day}`}
+        class="door ${status ?? ''} ${this.effect ?? ''}"
+        ?disabled=${!status}
+        aria-label=${status ? `Türchen ${this.day}, ${STATUS_LABELS[status]}` : `Türchen ${this.day}`}
       >
-        <span class="number">${this.day}</span>
-        ${this.renderExtra()}
+        ${status === 'opened'
+          ? html`
+              <span class="inside" aria-hidden="true">
+                <span class="inside-number">${this.day}</span>
+                <span class="inside-check">✔</span>
+              </span>
+            `
+          : nothing}
+        <span class="leaf">
+          <span class="number">${this.day}</span>
+          ${this.renderExtra()}
+        </span>
       </button>
     `;
   }
@@ -131,8 +266,6 @@ export class AdventCalendarDoor extends LitElement {
         return html`<span class="badge" aria-hidden="true">🔒</span>`;
       case 'openable':
         return html`<span class="note" aria-hidden="true">Heute!</span>`;
-      case 'opened':
-        return html`<span class="badge" aria-hidden="true">✔</span>`;
       case 'missed':
         return html`<span class="note" aria-hidden="true">Verpasst 😢</span>`;
       default:

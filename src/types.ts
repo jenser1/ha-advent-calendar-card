@@ -15,6 +15,8 @@ export interface HomeAssistant {
   states?: Record<string, { state: string }>;
   /** Verfügbare Dienste: domain → service → Beschreibung. */
   services?: Record<string, Record<string, unknown>>;
+  /** darkMode: HA zeigt gerade das dunkle Design. */
+  themes?: { darkMode?: boolean };
   callService(
     domain: string,
     service: string,
@@ -39,6 +41,10 @@ export interface AdventCalendarCardConfig {
   debug_date?: string | Date;
   /** Standard-Theme für alle Personen. */
   theme?: ThemeName;
+  /** Schneefall über der Karte (Standard: aus). */
+  snow?: boolean;
+  /** Türchen pro Person fest gemischt (Standard: an). */
+  shuffle?: boolean;
   /** Text im Dialog, wenn für ein Türchen kein Inhalt eingetragen ist. */
   empty_text?: string;
   /** Personen, Schlüssel ist ein frei wählbarer Name. Ein leerer Eintrag (`anna:`) ist null. */

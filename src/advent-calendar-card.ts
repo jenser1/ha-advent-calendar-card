@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { version } from '../package.json';
 import {
   normalizeEffects,
@@ -20,7 +21,7 @@ import {
   type DoorStatus,
   type EffectiveToday,
 } from './date-logic';
-import './door';
+import { OPEN_ANIMATION_MS, type AdventCalendarDoor } from './door';
 import { DEFAULT_EMPTY_TEXT } from './door-dialog';
 import {
   findCalendar,
@@ -40,7 +41,15 @@ import {
   withTaskDone,
   type CalendarState,
 } from './storage';
-import { resolveTheme } from './themes';
+import './snow';
+import {
+  colorMode,
+  doorColor,
+  prefersReducedMotion,
+  resolveTheme,
+  shuffledDays,
+  themeStyles,
+} from './themes';
 import type { AdventCalendarCardConfig, HomeAssistant } from './types';
 
 export const CARD_TAG = 'advent-calendar-card';
@@ -69,7 +78,8 @@ export class AdventCalendarCard extends LitElement {
   }
 
   // Bewusst nicht reaktiv: HA setzt hass bei jeder Zustandsänderung neu.
-  // Neu berechnet wird nur, wenn sich Benutzer, Zeitzone oder Admin-Status ändern.
+  // Neu berechnet bzw. gezeichnet wird nur, wenn sich Benutzer, Zeitzone,
+  // Admin-Status oder hell/dunkel ändern.
   set hass(hass: HomeAssistant | undefined) {
     const previous = this._hass;
     this._hass = hass;
@@ -80,7 +90,16 @@ export class AdventCalendarCard extends LitElement {
       previous?.config.time_zone !== hass?.config.time_zone
     ) {
       this.refresh();
+      this.requestUpdate();
+    } else if (previous?.themes?.darkMode !== hass?.themes?.darkMode) {
+      this.requestUpdate();
     }
+  }
+
+  /** Dunkles Design laut HA; ohne Angabe von HA zählt die Einstellung des Geräts. */
+  private get darkMode(): boolean {
+    const darkMode = this._hass?.themes?.darkMode;
+    return darkMode ?? window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   }
 
   static getStubConfig(): Omit<AdventCalendarCardConfig, 'type'> {
@@ -100,6 +119,11 @@ export class AdventCalendarCard extends LitElement {
     }
     if (config.empty_text !== undefined && typeof config.empty_text !== 'string') {
       throw new Error('„empty_text“ muss ein Text sein.');
+    }
+    for (const option of ['snow', 'shuffle'] as const) {
+      if (config[option] !== undefined && typeof config[option] !== 'boolean') {
+        throw new Error(`„${option}“ muss true oder false sein.`);
+      }
     }
     validatePersonConfig(config);
     this.config = config;
@@ -201,12 +225,24 @@ export class AdventCalendarCard extends LitElement {
     }
   }
 
-  private onDoorClick(day: number, status: DoorStatus | undefined, daysLeft: number): void {
+  private onDoorClick(
+    door: AdventCalendarDoor,
+    day: number,
+    status: DoorStatus | undefined,
+    daysLeft: number,
+  ): void {
     if (status === 'locked') {
+      door.wobble();
       this.toast(daysLeft === 1 ? 'Noch 1 Tag!' : `Noch ${daysLeft} Tage!`);
     } else if (status === 'openable') {
+      door.playOpening();
       void this.openDoor(day);
-      this.openDay = day;
+      // Erst aufklappen lassen, dann den Inhalt zeigen.
+      if (prefersReducedMotion()) {
+        this.openDay = day;
+      } else {
+        window.setTimeout(() => (this.openDay = day), OPEN_ANIMATION_MS);
+      }
     } else if (status === 'opened') {
       this.openDay = day;
     }
@@ -357,24 +393,32 @@ export class AdventCalendarCard extends LitElement {
       ? findCalendar(this.config, user)
       : { calendar: {} };
 
+    const theme = resolveTheme(match?.calendar.theme, this.config.theme);
+    const mode = colorMode(theme, this.darkMode);
+    const snow = this.config.snow ? html`<advent-calendar-snow></advent-calendar-snow>` : nothing;
+
     if (!match) {
       return html`
-        <ha-card class="theme-${resolveTheme(this.config.theme)}">
+        <ha-card class="theme-${theme} ${mode}">
           ${header}
           <div class="no-calendar">Für dich gibt’s noch keinen Kalender 🎅</div>
+          ${snow}
         </ha-card>
       `;
     }
 
     const calendar = this.calendar;
-    const theme = resolveTheme(match.calendar.theme, this.config.theme);
-    const days = Array.from({ length: DOOR_COUNT }, (_, i) => i + 1);
+    // Pro Benutzer und Jahr fest gemischt; solange der Benutzer unbekannt ist, 1–24.
+    const days =
+      this.config.shuffle === false || !user
+        ? Array.from({ length: DOOR_COUNT }, (_, i) => i + 1)
+        : shuffledDays(`${user.id}-${year}`);
     const openDay = this.openDay;
     const door = openDay === undefined ? {} : resolveDoor(this.config, match.calendar, openDay);
     const notice = user?.is_admin ? this.sharedEffectNotice() : undefined;
 
     return html`
-      <ha-card class="theme-${theme}">
+      <ha-card class="theme-${theme} ${mode}">
         ${header}
         ${debug
           ? html`
@@ -392,18 +436,30 @@ export class AdventCalendarCard extends LitElement {
           : nothing}
         ${notice ? html`<div class="notice">${notice}</div>` : nothing}
         <div class="doors">
-          ${days.map((day) => {
-            const status = calendar
-              ? getDoorStatus(day, year, today, isOpened(calendar, day))
-              : undefined;
-            return html`
-              <advent-calendar-door
-                .day=${day}
-                .status=${status}
-                @click=${() => this.onDoorClick(day, status, daysUntilDoor(day, year, today))}
-              ></advent-calendar-door>
-            `;
-          })}
+          ${repeat(
+            days,
+            (day) => day,
+            (day) => {
+              const status = calendar
+                ? getDoorStatus(day, year, today, isOpened(calendar, day))
+                : undefined;
+              const color = doorColor(theme, mode, day);
+              return html`
+                <advent-calendar-door
+                  .day=${day}
+                  .status=${status}
+                  style=${color ? `--advent-door-bg: ${color}` : ''}
+                  @click=${(event: Event) =>
+                    this.onDoorClick(
+                      event.currentTarget as AdventCalendarDoor,
+                      day,
+                      status,
+                      daysUntilDoor(day, year, today),
+                    )}
+                ></advent-calendar-door>
+              `;
+            },
+          )}
         </div>
         ${calendar && isSeasonOver(year, today)
           ? html`<div class="stats">${openedCount(calendar)}/${DOOR_COUNT} geöffnet</div>`
@@ -419,17 +475,33 @@ export class AdventCalendarCard extends LitElement {
           @dialog-closed=${() => (this.openDay = undefined)}
           @task-toggle=${this.onTaskToggle}
         ></advent-calendar-dialog>
+        ${snow}
       </ha-card>
     `;
   }
 
-  static styles = css`
+  static styles = [
+    themeStyles,
+    css`
     :host {
       display: block;
     }
 
     ha-card {
       container-type: inline-size;
+      position: relative;
+      overflow: hidden;
+      --ha-card-background: var(--advent-bg, var(--card-background-color));
+    }
+
+    /* Inhalte über dem Schnee */
+    ha-card > :not(advent-calendar-snow) {
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-header {
+      color: var(--advent-text, var(--primary-text-color));
     }
 
     .debug,
@@ -497,14 +569,14 @@ export class AdventCalendarCard extends LitElement {
     .stats {
       padding: 0 16px 16px;
       text-align: center;
-      color: var(--secondary-text-color);
+      color: var(--advent-muted, var(--secondary-text-color));
     }
 
     .no-calendar {
       padding: 16px 16px 24px;
       text-align: center;
       font-size: 1.1em;
-      color: var(--secondary-text-color);
+      color: var(--advent-muted, var(--secondary-text-color));
     }
 
     .no-calendar:first-child {
@@ -517,7 +589,8 @@ export class AdventCalendarCard extends LitElement {
         gap: 12px;
       }
     }
-  `;
+  `,
+  ];
 }
 
 if (!customElements.get(CARD_TAG)) {

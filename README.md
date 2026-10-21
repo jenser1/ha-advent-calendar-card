@@ -43,7 +43,9 @@ year: 2026
 | `title`      | Text               | `Adventskalender <Jahr>` | Überschrift; `""` blendet sie aus                   |
 | `year`       | Zahl               | aktuelles Jahr           | Jahr, für das der Kalender gilt                     |
 | `debug_date` | Datum `JJJJ-MM-TT` | –                        | Testdatum, wirkt nur für Admins (siehe Testmodus)   |
-| `theme`      | `winter`, `kids`, `nerd` | `winter`           | Standard-Theme für alle Personen                    |
+| `theme`      | `winter`, `kids`, `nerd` | `winter`           | Standard-Theme für alle Personen (siehe Aussehen)   |
+| `snow`       | `true`/`false`     | `false`                  | Schneefall in der Karte                             |
+| `shuffle`    | `true`/`false`     | `true`                   | Türchen pro Person fest gemischt                    |
 | `users`      | Personen           | –                        | Ein Kalender pro Person (siehe Personen)            |
 | `fallback`   | Kalender           | –                        | Für alle ohne eigenen Eintrag in `users`            |
 | `empty_text` | Text               | „Heute ist das Türchen leer …“ | Text für Türchen ohne Inhalt                  |
@@ -186,6 +188,21 @@ shared:
 
 Ohne Helfer läuft der gemeinsame Effekt bei jeder Person einmal; Admins sehen dazu einen Hinweis in der Karte. Mit `shared.effect_once: false` ist das gewollt und der Hinweis verschwindet. Öffnen zwei Personen im selben Moment, kann der Effekt trotzdem doppelt laufen. Im Testmodus schreibt die Karte `test:…` in den Helfer, damit Tests den echten Tag nicht blockieren; **Testdaten zurücksetzen** löscht diesen Test-Merker.
 
+### Aussehen
+
+| Theme    | Look                                                                      |
+| -------- | ------------------------------------------------------------------------- |
+| `winter` | Nachthimmel in Blau mit goldenen Zahlen; hell: Eisblau mit Gold            |
+| `kids`   | Jedes Türchen in einer anderen Farbe, große runde Zahlen                   |
+| `nerd`   | Terminal-Look in Grün auf Schwarz, Überschrift mit blinkendem Cursor       |
+
+- `winter` und `kids` folgen dem hellen bzw. dunklen Design von Home Assistant, `nerd` ist immer dunkel. Der Dialog nutzt die normalen HA-Farben.
+- Das Theme gilt für die Karte und lässt sich pro Person überschreiben (`users.<name>.theme`).
+- Das heutige Türchen pulsiert, gesperrte wackeln beim Antippen, beim Öffnen klappt das Türchen auf. Geöffnete Türchen bleiben aufgeklappt.
+- `shuffle` (Standard an) mischt die Türchen pro Person und Jahr – immer gleich, auf allen Geräten.
+- `snow: true` lässt es in der Karte schneien. Der Schnee pausiert, wenn die Karte nicht zu sehen ist.
+- Ist am Gerät „Bewegung reduzieren“ eingestellt, gibt es weder Animationen noch Schnee.
+
 ### Wann sich ein Türchen öffnen lässt
 
 „Heute“ ist das Datum in der Zeitzone von Home Assistant (Einstellungen → System → Allgemein), nicht die des Geräts.
@@ -194,7 +211,7 @@ Ohne Helfer läuft der gemeinsame Effekt bei jeder Person einmal; Admins sehen d
 | --------- | --------------------------------------- | ------------------------------- |
 | gesperrt  | Tag liegt in der Zukunft                | 🔒, beim Antippen „Noch X Tage!“ |
 | öffenbar  | heute ist der Tag                       | leuchtet, „Heute!“              |
-| offen     | wurde geöffnet                          | ✔, Inhalt jederzeit wieder ansehbar |
+| offen     | wurde geöffnet                          | aufgeklappt mit ✔, Inhalt jederzeit wieder ansehbar |
 | verpasst  | Tag ist vorbei, nie geöffnet            | grau, „Verpasst 😢“             |
 
 Ab dem 25. Dezember zeigt die Karte, wie viele Türchen geöffnet wurden.

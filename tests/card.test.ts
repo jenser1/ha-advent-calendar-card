@@ -262,7 +262,7 @@ describe('Mehrere Personen', () => {
   };
 
   const cardTheme = (card: HTMLElement) =>
-    card.shadowRoot!.querySelector('ha-card')?.getAttribute('class');
+    [...card.shadowRoot!.querySelector('ha-card')!.classList].find((c) => c.startsWith('theme-'));
 
   it('zeigt Personen ihren Kalender mit eigenem Theme', async () => {
     setNow('2026-12-05T12:00:00Z');

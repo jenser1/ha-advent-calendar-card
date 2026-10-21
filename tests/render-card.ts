@@ -26,9 +26,37 @@ export async function renderCard(
   return card;
 }
 
+/** Türchen sortiert nach Tag (Index = Tag − 1), unabhängig von der gemischten Anzeige. */
 export function doors(card: HTMLElement) {
+  return displayedDoors(card).sort((a, b) => a.day - b.day);
+}
+
+/** Türchen in der angezeigten Reihenfolge. */
+export function displayedDoors(card: HTMLElement) {
   return [...card.shadowRoot!.querySelectorAll('advent-calendar-door')];
 }
+
+/**
+ * Simuliert die Geräteeinstellungen „Bewegung reduzieren“ und hell/dunkel.
+ * Standard in Tests: Bewegung reduziert, damit Dialoge ohne Animation sofort öffnen.
+ */
+export function setMediaPreferences(options: { reducedMotion?: boolean; dark?: boolean } = {}) {
+  const { reducedMotion = true, dark = false } = options;
+  window.matchMedia = ((query: string) => ({
+    matches:
+      (query.includes('prefers-reduced-motion: reduce') && reducedMotion) ||
+      (query.includes('prefers-color-scheme: dark') && dark),
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+}
+
+setMediaPreferences();
 
 export function statuses(card: HTMLElement) {
   return doors(card).map((door) => door.status);
