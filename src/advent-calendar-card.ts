@@ -23,6 +23,7 @@ import {
 } from './date-logic';
 import { OPEN_ANIMATION_MS, type AdventCalendarDoor } from './door';
 import { DEFAULT_EMPTY_TEXT } from './door-dialog';
+import { EDITOR_TAG } from './editor/advent-calendar-card-editor';
 import {
   findCalendar,
   resolveDoor,
@@ -104,6 +105,11 @@ export class AdventCalendarCard extends LitElement {
 
   static getStubConfig(): Omit<AdventCalendarCardConfig, 'type'> {
     return { title: 'Adventskalender' };
+  }
+
+  /** Visueller Editor im Dashboard-Editor von HA. */
+  static getConfigElement(): HTMLElement {
+    return document.createElement(EDITOR_TAG);
   }
 
   setConfig(config: AdventCalendarCardConfig): void {

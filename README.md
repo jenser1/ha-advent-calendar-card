@@ -32,6 +32,21 @@ Folgt mit dem ersten Release.
 
 ## Konfiguration
 
+Die Karte lässt sich im Dashboard-Editor visuell einstellen oder per YAML – beides landet in derselben Konfiguration.
+
+### Visueller Editor
+
+| Tab         | Inhalt                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------- |
+| Allgemein   | Überschrift, Jahr, Theme, Schnee, Mischen, Text für leere Türchen, Testdatum (nur Admins) |
+| Personen    | Personen anlegen, umbenennen, löschen; HA-Benutzer und Theme pro Person; Fallback an/aus |
+| Türchen     | folgt                                                                                   |
+| Gemeinsam   | folgt                                                                                   |
+
+Personen und den Fallback mit eingetragenen Türchen löscht der Editor erst nach einer Rückfrage.
+
+### YAML
+
 ```yaml
 type: custom:advent-calendar-card
 title: Adventskalender 2026
