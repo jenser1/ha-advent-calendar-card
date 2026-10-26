@@ -40,10 +40,12 @@ Die Karte lässt sich im Dashboard-Editor visuell einstellen oder per YAML – b
 | ----------- | --------------------------------------------------------------------------------------- |
 | Allgemein   | Überschrift, Jahr, Theme, Schnee, Mischen, Text für leere Türchen, Testdatum (nur Admins) |
 | Personen    | Personen anlegen, umbenennen, löschen; HA-Benutzer und Theme pro Person; Fallback an/aus |
-| Türchen     | folgt                                                                                   |
+| Türchen     | Person (oder Fallback) wählen, Türchen im Raster anklicken, Bausteine hinzufügen, ausfüllen, verschieben, entfernen; „Türchen testen“ und „Effekt auslösen“ |
 | Gemeinsam   | folgt                                                                                   |
 
 Personen und den Fallback mit eingetragenen Türchen löscht der Editor erst nach einer Rückfrage.
+
+Im Tab **Türchen** zeigt das Raster mit kleinen Symbolen, welche Türchen schon gefüllt sind. Effekte werden mit dem Aktions-Editor von Home Assistant eingestellt (wie bei Automationen). **Türchen testen** zeigt den Inhalt so, wie ihn die Person sieht – inklusive gemeinsamer Inhalte, ohne etwas zu speichern; Effekte laufen dabei nur über **Effekt auslösen**. Gerade angelegte, noch leere Bausteine ignoriert die Karte, bis sie ausgefüllt sind.
 
 ### YAML
 

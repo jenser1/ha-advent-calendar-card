@@ -109,6 +109,12 @@ export interface EffectCall {
   service?: string;
   data?: Record<string, unknown>;
   target?: Record<string, string | string[]>;
+  /** false: Aufruf ist abgeschaltet (schreibt HAs Aktions-Editor). */
+  enabled?: boolean;
+  /** Weitere Felder aus HAs Aktions-Editor; werden ignoriert. */
+  metadata?: Record<string, unknown>;
+  alias?: string;
+  continue_on_error?: boolean;
 }
 
 export type EffectConfig = EffectCall | EffectCall[];

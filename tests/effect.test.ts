@@ -41,13 +41,44 @@ describe('validateEffect', () => {
     expect(check({ action: 'light.turn_on', target: { entity: 'light.flur' } })).toThrow(
       /„doors\.5\.effect\.target\.entity“ gibt es nicht/,
     );
-    expect(check({ action: 'light.turn_on', target: { entity_id: [] } })).toThrow(/eine ID oder eine Liste/);
+    expect(check({ action: 'light.turn_on', target: { entity_id: [''] } })).toThrow(/eine ID oder eine Liste/);
     expect(check({ action: 'light.turn_on', entitiy_id: 'light.flur' })).toThrow(/„doors\.5\.effect\.entitiy_id“/);
   });
 
   it('nennt in Listen die Nummer des fehlerhaften Eintrags', () => {
     expect(check([{ action: 'light.turn_on' }, { action: 'kaputt' }])).toThrow(/„doors\.5\.effect\.2\.action“/);
-    expect(check([])).toThrow(/leere Liste/);
+  });
+
+  it('akzeptiert, was HAs Aktions-Editor schreibt', () => {
+    expect(
+      check([
+        {
+          action: 'light.turn_on',
+          metadata: {},
+          data: {},
+          target: { entity_id: [] },
+          alias: 'Flurlicht',
+          enabled: false,
+          continue_on_error: true,
+        },
+      ]),
+    ).not.toThrow();
+    expect(check([])).not.toThrow();
+    expect(check([{ action: '' }])).not.toThrow();
+  });
+
+  it('erklärt, dass nur Dienst-Aufrufe gehen', () => {
+    expect(check([{ delay: { seconds: 5 } }])).toThrow(/nur Dienste aufrufen.*keine Verzögerungen/);
+  });
+
+  it('überspringt abgeschaltete und noch leere Aufrufe', () => {
+    expect(
+      normalizeEffects([
+        { action: 'light.turn_on', enabled: false },
+        { action: '' },
+        { action: 'script.advent_lichtshow' },
+      ]),
+    ).toEqual([{ action: 'script.advent_lichtshow' }]);
   });
 });
 

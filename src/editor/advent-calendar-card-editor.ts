@@ -1,17 +1,19 @@
 import { LitElement, css, html } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import type { AdventCalendarCardConfig, HomeAssistant } from '../types';
+import { fireConfigChanged, loadHaFormComponents } from './shared';
+import './tab-doors';
 import './tab-general';
 import './tab-persons';
-import { fireConfigChanged, loadHaFormComponents } from './shared';
 
 export const EDITOR_TAG = 'advent-calendar-card-editor';
 
-type Tab = 'general' | 'persons';
+type Tab = 'general' | 'persons' | 'doors';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: 'Allgemein' },
   { id: 'persons', label: 'Personen' },
+  { id: 'doors', label: 'Türchen' },
 ];
 
 /**
@@ -69,6 +71,17 @@ export class AdventCalendarCardEditor extends LitElement {
     }
   `;
 
+  private renderTab(config: AdventCalendarCardConfig) {
+    switch (this.tab) {
+      case 'general':
+        return html`<advent-calendar-editor-general .hass=${this.hass} .config=${config}></advent-calendar-editor-general>`;
+      case 'persons':
+        return html`<advent-calendar-editor-persons .hass=${this.hass} .config=${config}></advent-calendar-editor-persons>`;
+      default:
+        return html`<advent-calendar-editor-doors .hass=${this.hass} .config=${config}></advent-calendar-editor-doors>`;
+    }
+  }
+
   render() {
     const config = this.config;
     if (!config) {
@@ -89,11 +102,7 @@ export class AdventCalendarCardEditor extends LitElement {
           `,
         )}
       </div>
-      <div @config-changed=${this.onConfigChanged}>
-        ${this.tab === 'general'
-          ? html`<advent-calendar-editor-general .hass=${this.hass} .config=${config}></advent-calendar-editor-general>`
-          : html`<advent-calendar-editor-persons .hass=${this.hass} .config=${config}></advent-calendar-editor-persons>`}
-      </div>
+      <div @config-changed=${this.onConfigChanged}>${this.renderTab(config)}</div>
     `;
   }
 }

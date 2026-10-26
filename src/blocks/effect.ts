@@ -22,21 +22,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Aktive Aufrufe als Liste. Übersprungen werden mit `enabled: false` abgeschaltete
+ * (so schreibt es HAs Aktions-Editor) und noch leere aus dem Editor.
+ */
 export function normalizeEffects(effect: EffectConfig | undefined): EffectCall[] {
   if (!effect) {
     return [];
   }
-  return Array.isArray(effect) ? effect : [effect];
+  const calls = Array.isArray(effect) ? effect : [effect];
+  return calls.filter((call) => call.enabled !== false && (call.action ?? call.service ?? '') !== '');
 }
+
+// Felder, die HAs Aktions-Editor zusätzlich schreibt; sie werden akzeptiert und ignoriert.
+const EDITOR_KEYS = ['metadata', 'alias', 'enabled', 'continue_on_error'];
 
 function validateCall(value: unknown, path: string): void {
   if (!isRecord(value)) {
     throw new Error(`„${path}“ muss einen Aufruf enthalten, z. B. „action: script.turn_on“.`);
   }
-  const allowed = ['action', 'service', 'data', 'target'];
+  const allowed = ['action', 'service', 'data', 'target', ...EDITOR_KEYS];
   const unknown = Object.keys(value).find((key) => !allowed.includes(key));
   if (unknown) {
-    throw new Error(`„${path}.${unknown}“ gibt es nicht. Möglich sind: ${allowed.join(', ')}.`);
+    throw new Error(
+      `„${path}.${unknown}“ gibt es nicht. Effekte können nur Dienste aufrufen (action, data, target) – keine Verzögerungen oder Bedingungen.`,
+    );
   }
   if (value.action !== undefined && value.service !== undefined) {
     throw new Error(`„${path}“: bitte nur „action“ oder „service“ angeben, nicht beides.`);
@@ -45,6 +55,10 @@ function validateCall(value: unknown, path: string): void {
   const name = value[key];
   if (name === undefined) {
     throw new Error(`„${path}“ braucht „action“, z. B. „action: script.advent_lichtshow“.`);
+  }
+  if (name === '') {
+    // Im Editor noch nicht ausgewählt – wird nicht ausgeführt.
+    return;
   }
   if (typeof name !== 'string' || !SERVICE_NAME.test(name.trim())) {
     throw new Error(`„${path}.${key}“ muss die Form „domain.dienst“ haben, z. B. script.turn_on.`);
@@ -62,8 +76,9 @@ function validateCall(value: unknown, path: string): void {
           `„${path}.target.${targetKey}“ gibt es nicht. Möglich sind: ${TARGET_KEYS.join(', ')}.`,
         );
       }
+      // Eine leere Liste (im Editor alles abgewählt) ist erlaubt.
       const list = Array.isArray(ids) ? ids : [ids];
-      if (list.length === 0 || list.some((id) => typeof id !== 'string' || id.trim() === '')) {
+      if (list.some((id) => typeof id !== 'string' || id.trim() === '')) {
         throw new Error(`„${path}.target.${targetKey}“ muss eine ID oder eine Liste von IDs sein.`);
       }
     }
@@ -73,9 +88,7 @@ function validateCall(value: unknown, path: string): void {
 /** Prüft `effect`: ein Aufruf oder eine Liste von Aufrufen. */
 export function validateEffect(value: unknown, path: string): void {
   if (Array.isArray(value)) {
-    if (value.length === 0) {
-      throw new Error(`„${path}“ ist eine leere Liste.`);
-    }
+    // Eine leere Liste heißt: noch kein Effekt gewählt.
     value.forEach((call, index) => validateCall(call, `${path}.${index + 1}`));
     return;
   }

@@ -1,69 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest';
-import '../src/advent-calendar-card';
-import type { AdventCalendarCardConfig } from '../src/types';
-import { mockHass } from './mock-hass';
 import { TYPE, settle } from './render-card';
+import { buttons, change, forms, last, openTab, renderEditor, tabElement } from './render-editor';
 
 afterEach(() => {
   document.body.replaceChildren();
 });
-
-type FormElement = HTMLElement & {
-  data: Record<string, unknown>;
-  schema: { name: string }[];
-};
-
-type Editor = HTMLElementTagNameMap['advent-calendar-card-editor'];
-
-const last = <T>(items: T[]): T => items[items.length - 1];
-
-async function renderEditor(config: Omit<AdventCalendarCardConfig, 'type'>, isAdmin = true) {
-  const editor = document.createElement('advent-calendar-card-editor');
-  editor.hass = mockHass({ isAdmin });
-  editor.setConfig({ type: TYPE, ...config });
-  const changes: AdventCalendarCardConfig[] = [];
-  editor.addEventListener('config-changed', (event) => {
-    changes.push((event as CustomEvent<{ config: AdventCalendarCardConfig }>).detail.config);
-  });
-  document.body.append(editor);
-  await settle(editor);
-  return { editor, changes };
-}
-
-function tabElement(editor: HTMLElement) {
-  return editor.shadowRoot!.querySelector<HTMLElement & { updateComplete: Promise<boolean> }>(
-    'advent-calendar-editor-general, advent-calendar-editor-persons',
-  )!;
-}
-
-function forms(editor: HTMLElement): FormElement[] {
-  return [...tabElement(editor).shadowRoot!.querySelectorAll<FormElement>('ha-form')];
-}
-
-/** Simuliert eine Eingabe in <ha-form>: HA meldet immer den kompletten neuen Datensatz. */
-async function change(editor: Editor, form: FormElement, patch: Record<string, unknown>) {
-  form.dispatchEvent(
-    new CustomEvent('value-changed', { detail: { value: { ...form.data, ...patch } }, bubbles: true }),
-  );
-  await settle(editor);
-  await settle(tabElement(editor));
-}
-
-async function openTab(editor: Editor, label: string) {
-  const tab = [...editor.shadowRoot!.querySelectorAll<HTMLButtonElement>('.tab')].find(
-    (button) => button.textContent?.trim() === label,
-  )!;
-  tab.click();
-  await settle(editor);
-  await settle(tabElement(editor));
-}
-
-function buttons(editor: HTMLElement, text: string) {
-  return [...tabElement(editor).shadowRoot!.querySelectorAll<HTMLButtonElement>('button')].filter((b) =>
-    b.textContent?.includes(text),
-  );
-}
 
 describe('Editor einbinden', () => {
   it('liefert den Editor über getConfigElement', () => {
@@ -142,8 +84,8 @@ describe('Tab „Allgemein“', () => {
   });
 
   it('zeigt das Testdatum nur Admins', async () => {
-    const admin = await renderEditor({}, true);
-    const user = await renderEditor({}, false);
+    const admin = await renderEditor({}, { isAdmin: true });
+    const user = await renderEditor({}, { isAdmin: false });
     const names = (editor: HTMLElement) => forms(editor)[0].schema.map((field) => field.name);
 
     expect(names(admin.editor)).toContain('debug_date');

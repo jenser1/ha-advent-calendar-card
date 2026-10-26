@@ -2,7 +2,7 @@ import type { TemplateResult } from 'lit';
 import type { DoorContent } from '../types';
 import { validateEffect } from './effect';
 import { imageStyles, renderImage } from './image';
-import { LINK_KINDS, linkStyles, renderLink } from './link';
+import { LINK_KINDS, linkStyles, normalizeLink, renderLink } from './link';
 import { renderTask, taskStyles } from './task';
 import { renderText, textStyles } from './text';
 import { isSafeUrl } from './url';
@@ -10,11 +10,18 @@ import { parseVideo, renderVideo, videoStyles } from './video';
 
 export const blockStyles = [textStyles, imageStyles, taskStyles, linkStyles, videoStyles];
 
-const BLOCK_KEYS = ['text', 'answer', 'image', 'task', 'link', 'video', 'effect'] as const;
-const VISIBLE_KEYS = ['text', 'image', 'task', 'link', 'video'] as const;
+export const BLOCK_KEYS = ['text', 'answer', 'image', 'task', 'link', 'video', 'effect'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Leere Werte (z. B. ein gerade im Editor hinzugefügter Baustein) gelten als
+ * „nicht gesetzt“: Sie werden weder geprüft noch angezeigt.
+ */
+function isBlank(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
 }
 
 function requireText(value: unknown, path: string): void {
@@ -45,14 +52,15 @@ function validateLink(value: unknown, path: string): void {
   if (unknown) {
     throw new Error(`„${path}.${unknown}“ gibt es nicht. Möglich sind: ${allowed.join(', ')}.`);
   }
-  requireUrl(value.url, `${path}.url`);
-  if (value.title !== undefined) {
-    requireText(value.title, `${path}.title`);
+  if (!isBlank(value.url)) {
+    requireUrl(value.url, `${path}.url`);
   }
-  if (value.description !== undefined) {
-    requireText(value.description, `${path}.description`);
+  for (const key of ['title', 'description'] as const) {
+    if (!isBlank(value[key])) {
+      requireText(value[key], `${path}.${key}`);
+    }
   }
-  if (value.kind !== undefined && !(LINK_KINDS as readonly unknown[]).includes(value.kind)) {
+  if (!isBlank(value.kind) && !(LINK_KINDS as readonly unknown[]).includes(value.kind)) {
     throw new Error(`„${path}.kind“ muss eines davon sein: ${LINK_KINDS.join(', ')}.`);
   }
 }
@@ -65,17 +73,17 @@ export function validateDoorContent(content: Record<string, unknown>, path: stri
     }
   }
   for (const key of ['text', 'answer', 'task'] as const) {
-    if (content[key] !== undefined) {
+    if (!isBlank(content[key])) {
       requireText(content[key], `${path}.${key}`);
     }
   }
-  if (content.answer !== undefined && content.text === undefined) {
+  if (!isBlank(content.answer) && isBlank(content.text)) {
     throw new Error(`„${path}.answer“ braucht einen „text“ mit dem Rätsel.`);
   }
-  if (content.image !== undefined) {
+  if (!isBlank(content.image)) {
     requireUrl(content.image, `${path}.image`);
   }
-  if (content.video !== undefined) {
+  if (!isBlank(content.video)) {
     requireText(content.video, `${path}.video`);
     if (!parseVideo(content.video as string)) {
       throw new Error(
@@ -83,17 +91,38 @@ export function validateDoorContent(content: Record<string, unknown>, path: stri
       );
     }
   }
-  if (content.link !== undefined) {
+  if (!isBlank(content.link)) {
     validateLink(content.link, `${path}.link`);
   }
-  if (content.effect !== undefined) {
+  if (!isBlank(content.effect)) {
     validateEffect(content.effect, `${path}.effect`);
   }
 }
 
+/** Bausteine, die das Türchen tatsächlich anzeigt – in der Reihenfolge aus der YAML. */
+export function visibleBlocks(content: DoorContent | null | undefined): (keyof DoorContent)[] {
+  if (!content) {
+    return [];
+  }
+  return (Object.keys(content) as (keyof DoorContent)[]).filter((key) => {
+    switch (key) {
+      case 'text':
+      case 'image':
+      case 'task':
+      case 'video':
+        return !isBlank(content[key]);
+      case 'link':
+        return !isBlank(content.link) && !isBlank(normalizeLink(content.link!).url);
+      default:
+        // answer hängt am text, effect wird beim Öffnen ausgelöst.
+        return false;
+    }
+  });
+}
+
 /** true, wenn das Türchen etwas zum Anzeigen hat (ein reiner Effekt zählt nicht). */
 export function hasVisibleContent(content: DoorContent | null | undefined): boolean {
-  return !!content && VISIBLE_KEYS.some((key) => content[key] !== undefined);
+  return visibleBlocks(content).length > 0;
 }
 
 export interface BlockContext {
@@ -106,30 +135,23 @@ export interface BlockContext {
 
 /** Rendert die Bausteine in der Reihenfolge, in der sie in der YAML stehen. */
 export function renderBlocks(content: DoorContent, context: BlockContext): TemplateResult[] {
-  const blocks: TemplateResult[] = [];
-  for (const key of Object.keys(content) as (keyof DoorContent)[]) {
+  return visibleBlocks(content).map((key) => {
     switch (key) {
       case 'text':
-        blocks.push(
-          renderText(content.text!, content.answer, context.answerRevealed, context.onReveal),
+        return renderText(
+          content.text!,
+          isBlank(content.answer) ? undefined : content.answer,
+          context.answerRevealed,
+          context.onReveal,
         );
-        break;
       case 'image':
-        blocks.push(renderImage(content.image!, context.day));
-        break;
+        return renderImage(content.image!, context.day);
       case 'task':
-        blocks.push(renderTask(content.task!, context.taskDone, context.onToggleTask));
-        break;
+        return renderTask(content.task!, context.taskDone, context.onToggleTask);
       case 'link':
-        blocks.push(renderLink(content.link!));
-        break;
-      case 'video':
-        blocks.push(renderVideo(content.video!));
-        break;
+        return renderLink(content.link!);
       default:
-        // answer hängt am text, effect wird beim Öffnen ausgelöst.
-        break;
+        return renderVideo(content.video!);
     }
-  }
-  return blocks;
+  });
 }

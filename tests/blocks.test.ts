@@ -113,8 +113,16 @@ describe('validateDoorContent', () => {
 
   it('prüft Texte', () => {
     expect(ok({ text: 42 })).toThrow(/„doors\.1\.text“ muss ein Text sein/);
-    expect(ok({ task: '' })).toThrow(/„doors\.1\.task“/);
+    expect(ok({ task: '   ' })).toThrow(/„doors\.1\.task“/);
     expect(ok({ answer: 'Lösung' })).toThrow(/braucht einen „text“/);
+  });
+
+  it('ignoriert leere Felder, z. B. einen gerade im Editor angelegten Baustein', () => {
+    expect(
+      ok({ text: '', answer: '', image: '', task: null, video: '', link: { url: '', kind: 'shop' }, effect: [] }),
+    ).not.toThrow();
+    expect(hasVisibleContent({ text: '', image: '', link: { url: '' } })).toBe(false);
+    expect(hasVisibleContent({ text: '', task: 'Kekse backen' })).toBe(true);
   });
 
   it('lässt keine gefährlichen Adressen zu', () => {
