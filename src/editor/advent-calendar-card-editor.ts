@@ -5,15 +5,17 @@ import { fireConfigChanged, loadHaFormComponents } from './shared';
 import './tab-doors';
 import './tab-general';
 import './tab-persons';
+import './tab-shared';
 
 export const EDITOR_TAG = 'advent-calendar-card-editor';
 
-type Tab = 'general' | 'persons' | 'doors';
+type Tab = 'general' | 'persons' | 'doors' | 'shared';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: 'Allgemein' },
   { id: 'persons', label: 'Personen' },
   { id: 'doors', label: 'Türchen' },
+  { id: 'shared', label: 'Gemeinsam' },
 ];
 
 /**
@@ -77,8 +79,10 @@ export class AdventCalendarCardEditor extends LitElement {
         return html`<advent-calendar-editor-general .hass=${this.hass} .config=${config}></advent-calendar-editor-general>`;
       case 'persons':
         return html`<advent-calendar-editor-persons .hass=${this.hass} .config=${config}></advent-calendar-editor-persons>`;
-      default:
+      case 'doors':
         return html`<advent-calendar-editor-doors .hass=${this.hass} .config=${config}></advent-calendar-editor-doors>`;
+      default:
+        return html`<advent-calendar-editor-shared .hass=${this.hass} .config=${config}></advent-calendar-editor-shared>`;
     }
   }
 

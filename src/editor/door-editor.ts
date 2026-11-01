@@ -1,8 +1,19 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { normalizeLink } from '../blocks/link';
-import type { DoorContent, EffectCall, HomeAssistant, LinkBlock, LinkKind } from '../types';
-import { editorStyles, type FormField } from './shared';
+import type {
+  DoorContent,
+  EffectCall,
+  HomeAssistant,
+  LinkBlock,
+  LinkKind,
+  SharedDoorContent,
+  SharedMode,
+} from '../types';
+import { SHARED_MODE_OPTIONS, editorStyles, type FormField } from './shared';
+
+/** Auswahlwert für „Modus wie in den Einstellungen“ (ein leerer Wert ist in HAs Auswahlliste nicht wählbar). */
+const DEFAULT_MODE = 'default';
 
 export type BlockKey = 'text' | 'image' | 'task' | 'link' | 'video' | 'effect';
 
@@ -173,7 +184,11 @@ function blockValues(block: BlockKey, data: Record<string, unknown>): Partial<Do
 export class AdventCalendarEditorDoor extends LitElement {
   @property({ attribute: false }) hass?: HomeAssistant;
   @property({ type: Number }) day = 0;
-  @property({ attribute: false }) content?: DoorContent | null;
+  @property({ attribute: false }) content?: SharedDoorContent | null;
+  /** Gemeinsame Türchen: eigener Modus pro Türchen wählbar. */
+  @property({ type: Boolean }) allowMode = false;
+  /** Beschriftung des Modus, der ohne eigenen Wert gilt („Wie oben (…)“). */
+  @property() defaultModeLabel = '';
 
   @state() private confirmClear = false;
 
@@ -225,9 +240,36 @@ export class AdventCalendarEditorDoor extends LitElement {
     }
   }
 
-  private emit(content: Partial<DoorContent>): void {
-    const next = Object.keys(content).length > 0 ? (content as DoorContent) : null;
+  private emit(content: Partial<SharedDoorContent>): void {
+    const next = Object.keys(content).length > 0 ? (content as SharedDoorContent) : null;
     this.dispatchEvent(new CustomEvent('content-changed', { detail: { content: next } }));
+  }
+
+  /** Modus pro Türchen setzen; er steht immer vorne im Türchen. */
+  private setMode(mode: string): void {
+    const { mode: _previous, ...rest } = this.content ?? {};
+    const isMode = SHARED_MODE_OPTIONS.some((option) => option.value === mode);
+    this.emit(isMode ? { mode: mode as SharedMode, ...rest } : rest);
+  }
+
+  private renderMode() {
+    const options = [
+      { value: DEFAULT_MODE, label: `Wie oben (${this.defaultModeLabel})` },
+      ...SHARED_MODE_OPTIONS,
+    ];
+    return html`
+      <ha-form
+        class="mode"
+        .hass=${this.hass}
+        .data=${{ mode: this.content?.mode ?? DEFAULT_MODE }}
+        .schema=${[{ name: 'mode', selector: { select: { mode: 'dropdown', options } } }]}
+        .computeLabel=${() => 'Modus für dieses Türchen'}
+        @value-changed=${(event: CustomEvent<{ value: { mode: string } }>) => {
+          event.stopPropagation();
+          this.setMode(event.detail.value.mode);
+        }}
+      ></ha-form>
+    `;
   }
 
   /** Ersetzt (oder entfernt bei undefined) einen Baustein an seiner Stelle; neue kommen ans Ende. */
@@ -324,6 +366,7 @@ export class AdventCalendarEditorDoor extends LitElement {
     const missing = BLOCK_ORDER.filter((block) => !blocks.includes(block));
     return html`
       <div class="section">
+        ${this.allowMode ? this.renderMode() : nothing}
         ${blocks.length === 0
           ? html`<p class="hint">Türchen ${this.day} ist noch leer. Füge unten Bausteine hinzu.</p>`
           : blocks.map((block, index) => this.renderBlock(block, index, blocks.length))}

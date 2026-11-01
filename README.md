@@ -41,7 +41,7 @@ Die Karte lässt sich im Dashboard-Editor visuell einstellen oder per YAML – b
 | Allgemein   | Überschrift, Jahr, Theme, Schnee, Mischen, Text für leere Türchen, Testdatum (nur Admins) |
 | Personen    | Personen anlegen, umbenennen, löschen; HA-Benutzer und Theme pro Person; Fallback an/aus |
 | Türchen     | Person (oder Fallback) wählen, Türchen im Raster anklicken, Bausteine hinzufügen, ausfüllen, verschieben, entfernen; „Türchen testen“ und „Effekt auslösen“ |
-| Gemeinsam   | folgt                                                                                   |
+| Gemeinsam   | Modus (aus / zusätzlich / statt persönlich), „einmal pro Tag“ mit Text-Helfer, gemeinsame Türchen mit eigenem Modus pro Türchen, Test und Effekt auslösen |
 
 Personen und den Fallback mit eingetragenen Türchen löscht der Editor erst nach einer Rückfrage.
 

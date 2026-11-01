@@ -1,6 +1,6 @@
 import { css } from 'lit';
 import { THEMES, type ThemeName } from '../themes';
-import type { AdventCalendarCardConfig } from '../types';
+import type { AdventCalendarCardConfig, SharedMode } from '../types';
 
 /** Ein Feld für HAs <ha-form>; `selector` entspricht den HA-Selectors (text, number, select …). */
 export interface FormField {
@@ -16,6 +16,17 @@ export const THEME_LABELS: Record<ThemeName, string> = {
 };
 
 export const THEME_OPTIONS = THEMES.map((theme) => ({ value: theme, label: THEME_LABELS[theme] }));
+
+export const SHARED_MODE_LABELS: Record<SharedMode, string> = {
+  off: 'Aus – nur persönliche Türchen',
+  merge: 'Zusätzlich – „Für alle“ und „Für dich“',
+  replace: 'Statt persönlich – alle sehen dasselbe',
+};
+
+export const SHARED_MODE_OPTIONS = (Object.keys(SHARED_MODE_LABELS) as SharedMode[]).map((mode) => ({
+  value: mode,
+  label: SHARED_MODE_LABELS[mode],
+}));
 
 /** Meldet eine geänderte Config an den Editor bzw. an HA. */
 export function fireConfigChanged(element: HTMLElement, config: AdventCalendarCardConfig): void {

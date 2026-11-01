@@ -3,11 +3,11 @@ import { state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { version } from '../package.json';
 import {
-  normalizeEffects,
   runEffects,
   runSharedEffects,
   setHelperValue,
   sharedEffectMarker,
+  sharedEffectNotice,
 } from './blocks/effect';
 import {
   DOOR_COUNT,
@@ -363,27 +363,6 @@ export class AdventCalendarCard extends LitElement {
     );
   }
 
-  /**
-   * Hinweis für Admins, wenn gemeinsame Effekte nicht „einmal pro Tag“ laufen können,
-   * weil kein Helfer eingetragen ist oder der eingetragene fehlt.
-   */
-  private sharedEffectNotice(): string | undefined {
-    const shared = this.config?.shared;
-    const hasSharedEffects = Object.values(shared?.doors ?? {}).some(
-      (door) => normalizeEffects(door?.effect).length > 0,
-    );
-    if (!shared || !hasSharedEffects || shared.effect_once === false) {
-      return undefined;
-    }
-    const helper = shared.effect_helper;
-    if (!helper) {
-      return 'ℹ️ Gemeinsame Effekte laufen bei jeder Person einmal. Für „einmal pro Tag“ einen Text-Helfer anlegen und als shared.effect_helper eintragen.';
-    }
-    if (this._hass?.states && !this._hass.states[helper]) {
-      return `⚠️ Den Helfer „${helper}“ gibt es nicht – gemeinsame Effekte laufen bei jeder Person.`;
-    }
-    return undefined;
-  }
 
   render() {
     const year = this.year;
@@ -421,7 +400,9 @@ export class AdventCalendarCard extends LitElement {
         : shuffledDays(`${user.id}-${year}`);
     const openDay = this.openDay;
     const door = openDay === undefined ? {} : resolveDoor(this.config, match.calendar, openDay);
-    const notice = user?.is_admin ? this.sharedEffectNotice() : undefined;
+    const notice = user?.is_admin
+      ? sharedEffectNotice(this.config.shared, this._hass?.states)
+      : undefined;
 
     return html`
       <ha-card class="theme-${theme} ${mode}">

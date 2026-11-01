@@ -1,4 +1,4 @@
-import type { EffectCall, EffectConfig, HomeAssistant } from '../types';
+import type { EffectCall, EffectConfig, HomeAssistant, SharedConfig } from '../types';
 
 /** Was ein Script als Variablen bekommt. */
 export interface EffectVariables {
@@ -134,6 +134,30 @@ export function findMissing(call: PreparedCall, hass: HomeAssistant): string | u
     if (missing) {
       return `„${missing}“ gibt es nicht.`;
     }
+  }
+  return undefined;
+}
+
+/**
+ * Hinweis (für Admins in Karte und Editor), wenn gemeinsame Effekte nicht „einmal
+ * pro Tag“ laufen können, weil kein Helfer eingetragen ist oder der eingetragene fehlt.
+ */
+export function sharedEffectNotice(
+  shared: SharedConfig | null | undefined,
+  states: HomeAssistant['states'],
+): string | undefined {
+  const hasSharedEffects = Object.values(shared?.doors ?? {}).some(
+    (door) => normalizeEffects(door?.effect).length > 0,
+  );
+  if (!shared || !hasSharedEffects || shared.effect_once === false) {
+    return undefined;
+  }
+  const helper = shared.effect_helper;
+  if (!helper) {
+    return 'ℹ️ Gemeinsame Effekte laufen bei jeder Person einmal. Für „einmal pro Tag“ einen Text-Helfer anlegen und als shared.effect_helper eintragen.';
+  }
+  if (states && !states[helper]) {
+    return `⚠️ Den Helfer „${helper}“ gibt es nicht – gemeinsame Effekte laufen bei jeder Person.`;
   }
   return undefined;
 }

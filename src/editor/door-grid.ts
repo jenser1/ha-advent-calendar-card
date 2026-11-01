@@ -59,11 +59,14 @@ export class AdventCalendarEditorDoorGrid extends LitElement {
     return html`
       <div class="grid">
         ${days.map((day) => {
-          const blocks = blocksOf(this.doors?.[day]);
+          const door = this.doors?.[day];
+          const blocks = blocksOf(door);
           const label = blocks.map((block) => BLOCK_INFO[block].label).join(', ');
+          // Auch ein gemeinsames Türchen nur mit eigenem Modus zählt als „gefüllt“.
+          const filled = Object.keys(door ?? {}).length > 0;
           return html`
             <button
-              class="cell ${blocks.length > 0 ? 'filled' : ''}"
+              class="cell ${filled ? 'filled' : ''}"
               aria-pressed=${this.selected === day ? 'true' : 'false'}
               title=${label ? `Türchen ${day}: ${label}` : `Türchen ${day}: leer`}
               @click=${() =>
