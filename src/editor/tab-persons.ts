@@ -1,7 +1,16 @@
 import { LitElement, html, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
+import {
+  FALLBACK_FILE,
+  SHARED_FILE,
+  contentFile,
+  fileName,
+  isReservedName,
+  usesJson,
+} from '../content-source';
 import { isThemeName } from '../themes';
 import type { AdventCalendarCardConfig, CalendarConfig, HomeAssistant, PersonConfig } from '../types';
+import { editorYear } from './file-doors';
 import {
   THEME_OPTIONS,
   editorStyles,
@@ -86,7 +95,22 @@ export class AdventCalendarEditorPersons extends LitElement {
     const taken = Object.keys(this.users).some(
       (other) => other !== key && other.trim().toLowerCase() === trimmed.toLowerCase(),
     );
-    return taken ? 'Diesen Namen gibt es schon.' : undefined;
+    if (taken) {
+      return 'Diesen Namen gibt es schon.';
+    }
+    if (usesJson(this.config) && isReservedName(trimmed)) {
+      return `Mit JSON-Dateien gehören „${FALLBACK_FILE}“ und „${SHARED_FILE}“ dem Fallback und den gemeinsamen Türchen.`;
+    }
+    return undefined;
+  }
+
+  /** Im JSON-Modus: aus welcher Datei die Türchen kommen. */
+  private renderFileHint(person: string | undefined) {
+    if (!usesJson(this.config)) {
+      return nothing;
+    }
+    const file = contentFile(this.config, fileName(person), editorYear(this.config, this.hass));
+    return html`<p class="hint file-hint">Türchen aus ${file.path}</p>`;
   }
 
   private onPersonChanged(key: string, event: CustomEvent<{ value: PersonData }>): void {
@@ -214,6 +238,7 @@ export class AdventCalendarEditorPersons extends LitElement {
         ${person?.user_id && duplicates.has(person.user_id)
           ? html`<p class="error-text">Dieser HA-Benutzer ist mehreren Personen zugeordnet.</p>`
           : nothing}
+        ${this.renderFileHint(key)}
       </div>
     `;
   }
@@ -246,6 +271,7 @@ export class AdventCalendarEditorPersons extends LitElement {
               ? 'Z. B. für ein Gäste-Tablet. Die Türchen dafür pflegst du im Tab „Türchen“.'
               : 'Aus: Wer keinen Eintrag hat, sieht „Für dich gibt’s noch keinen Kalender 🎅“.'}
           </p>
+          ${fallback || entries.length === 0 ? this.renderFileHint(undefined) : nothing}
           ${this.pendingRemoval === FALLBACK
             ? html`
                 <span class="confirm">

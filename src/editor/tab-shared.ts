@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { normalizeEffects, runEffects, sharedEffectNotice } from '../blocks/effect';
+import { SHARED_FILE, contentFile, doorsOf, usesJson, type ContentFile } from '../content-source';
 import { DEFAULT_EMPTY_TEXT } from '../door-dialog';
 import '../door-dialog';
 import type {
@@ -12,6 +13,13 @@ import type {
 } from '../types';
 import './door-editor';
 import './door-grid';
+import {
+  ContentFileController,
+  editorYear,
+  fileStyles,
+  renderFileBox,
+  renderFileDoor,
+} from './file-doors';
 import {
   SHARED_MODE_LABELS,
   SHARED_MODE_OPTIONS,
@@ -43,7 +51,8 @@ const HELPERS: Record<string, string> = {
 
 /**
  * Tab „Gemeinsam“: Modus, „einmal pro Tag“ mit Helfer und die gemeinsamen Türchen –
- * mit demselben Raster und Baustein-Editor wie im Tab „Türchen“.
+ * mit demselben Raster und Baustein-Editor wie im Tab „Türchen“. Mit content_source: json
+ * kommen die Türchen aus der Datei und werden nur angezeigt.
  */
 export class AdventCalendarEditorShared extends LitElement {
   @property({ attribute: false }) hass?: HomeAssistant;
@@ -53,8 +62,11 @@ export class AdventCalendarEditorShared extends LitElement {
   @state() private previewOpen = false;
   @state() private effectMessage?: string;
 
+  private files = new ContentFileController(this);
+
   static styles = [
     editorStyles,
+    fileStyles,
     css`
       h3 {
         margin: 8px 0 0;
@@ -80,6 +92,17 @@ export class AdventCalendarEditorShared extends LitElement {
 
   private get shared(): SharedConfig {
     return this.config.shared ?? {};
+  }
+
+  private get sharedFile(): ContentFile {
+    return contentFile(this.config, SHARED_FILE, editorYear(this.config, this.hass));
+  }
+
+  /** Gemeinsame Türchen – aus der YAML oder im JSON-Modus aus der Datei. */
+  private get doors(): SharedConfig['doors'] {
+    return usesJson(this.config)
+      ? doorsOf(this.files.get(this.sharedFile, true))
+      : this.shared.doors;
   }
 
   /** Schreibt shared zurück; ohne Inhalt und mit Standardwerten fällt es ganz weg. */
@@ -120,6 +143,12 @@ export class AdventCalendarEditorShared extends LitElement {
     this.emit(shared);
   }
 
+  /** Entfernt die (im JSON-Modus ignorierten) gemeinsamen Türchen aus der YAML. */
+  private removeYamlDoors(): void {
+    const { doors: _doors, ...shared } = this.shared;
+    this.emit(shared);
+  }
+
   private async triggerEffect(effect: SharedDoorContent['effect']): Promise<void> {
     if (!this.hass) {
       return;
@@ -129,12 +158,62 @@ export class AdventCalendarEditorShared extends LitElement {
       errors.length > 0 ? `Effekt nicht möglich: ${errors.join(' · ')}` : '✨ Effekt ausgelöst.';
   }
 
+  private renderFileDoors(door: SharedDoorContent | null) {
+    const file = this.sharedFile;
+    return html`
+      <p class="intro">
+        Die gemeinsamen Türchen kommen aus einer Datei (Inhaltsquelle JSON). Ändern kannst du
+        sie nur dort, danach hier „Neu laden“. Ein eigener Modus pro Türchen steht als „mode“
+        im Türchen.
+      </p>
+      ${renderFileBox(file, this.files.get(file, true), {
+        missingText: 'Keine Datei – damit gibt es keine gemeinsamen Türchen.',
+        onReload: () => this.files.reload(file, true),
+      })}
+      <advent-calendar-editor-door-grid
+        .doors=${this.doors}
+        .selected=${this.day}
+        @door-selected=${this.onDoorSelected}
+      ></advent-calendar-editor-door-grid>
+
+      <h3>Türchen ${this.day}</h3>
+      ${renderFileDoor(this.day, door)}
+    `;
+  }
+
+  private renderYamlDoors(door: SharedDoorContent | null, mode: SharedMode) {
+    return html`
+      <advent-calendar-editor-door-grid
+        .doors=${this.shared.doors}
+        .selected=${this.day}
+        @door-selected=${this.onDoorSelected}
+      ></advent-calendar-editor-door-grid>
+
+      <h3>Türchen ${this.day}</h3>
+      <advent-calendar-editor-door
+        .hass=${this.hass}
+        .day=${this.day}
+        .content=${door}
+        .allowMode=${true}
+        .defaultModeLabel=${SHARED_MODE_LABELS[mode]}
+        @content-changed=${this.onContentChanged}
+      ></advent-calendar-editor-door>
+    `;
+  }
+
+  private onDoorSelected = (event: CustomEvent<{ day: number }>): void => {
+    this.day = event.detail.day;
+    this.effectMessage = undefined;
+  };
+
   render() {
     const shared = this.shared;
+    const json = usesJson(this.config);
     const mode = shared.mode ?? DEFAULT_MODE;
-    const door = shared.doors?.[this.day] ?? null;
+    const doors = this.doors;
+    const door = doors?.[this.day] ?? null;
     const { mode: _mode, ...preview } = door ?? {};
-    const notice = sharedEffectNotice(shared, this.hass?.states);
+    const notice = sharedEffectNotice({ ...shared, doors }, this.hass?.states);
     const data: SettingsData = {
       mode,
       effect_once: shared.effect_once !== false,
@@ -158,24 +237,7 @@ export class AdventCalendarEditorShared extends LitElement {
         ${notice ? html`<p class="notice">${notice}</p>` : nothing}
 
         <h3>Gemeinsame Türchen</h3>
-        <advent-calendar-editor-door-grid
-          .doors=${shared.doors}
-          .selected=${this.day}
-          @door-selected=${(event: CustomEvent<{ day: number }>) => {
-            this.day = event.detail.day;
-            this.effectMessage = undefined;
-          }}
-        ></advent-calendar-editor-door-grid>
-
-        <h3>Türchen ${this.day}</h3>
-        <advent-calendar-editor-door
-          .hass=${this.hass}
-          .day=${this.day}
-          .content=${door}
-          .allowMode=${true}
-          .defaultModeLabel=${SHARED_MODE_LABELS[mode]}
-          @content-changed=${this.onContentChanged}
-        ></advent-calendar-editor-door>
+        ${json ? this.renderFileDoors(door) : this.renderYamlDoors(door, mode)}
 
         <div class="actions">
           <button class="button preview" @click=${() => (this.previewOpen = true)}>
@@ -192,6 +254,12 @@ export class AdventCalendarEditorShared extends LitElement {
           aussieht, testest du im Tab „Türchen“.
         </p>
         ${this.effectMessage ? html`<p class="hint effect-message">${this.effectMessage}</p>` : nothing}
+        <advent-calendar-editor-json-export
+          .doors=${shared.doors}
+          .file=${this.sharedFile}
+          .json=${json}
+          @remove-yaml-doors=${this.removeYamlDoors}
+        ></advent-calendar-editor-json-export>
       </div>
 
       <advent-calendar-dialog

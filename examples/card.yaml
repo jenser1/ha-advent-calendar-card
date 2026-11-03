@@ -1,0 +1,22 @@
+# Beispiel: Adventskalender-Card mit Inhalten aus JSON-Dateien.
+# Die Türchen stehen nicht im Dashboard, sondern in Dateien unter /config/www/advent/:
+#   /config/www/advent/jens.json    → Türchen für jens (siehe examples/jens.json)
+#   /config/www/advent/anna.json    → Türchen für anna
+#   /config/www/advent/shared.json  → gemeinsame Türchen (optional)
+#   /config/www/advent/fallback.json → Fallback-Kalender (nur mit fallback:)
+# Effekte wie script.advent_lichtshow stehen in examples/scripts.yaml.
+type: custom:advent-calendar-card
+title: Adventskalender 2026
+theme: winter
+snow: true
+content_source: json
+# json_path: /local/advent/{year}/{person}.json   # optional, Standard: /local/advent/{person}.json
+users:
+  jens:
+    theme: nerd
+  anna:
+    theme: kids
+fallback: {}
+shared:
+  mode: merge
+  effect_helper: input_text.adventskalender

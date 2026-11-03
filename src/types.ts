@@ -47,6 +47,10 @@ export interface AdventCalendarCardConfig {
   shuffle?: boolean;
   /** Text im Dialog, wenn für ein Türchen kein Inhalt eingetragen ist. */
   empty_text?: string;
+  /** Woher die Türchen kommen: aus dieser Config (Standard) oder aus JSON-Dateien. */
+  content_source?: ContentSource;
+  /** Pfad der JSON-Dateien mit {person} und optional {year}; Standard /local/advent/{person}.json. */
+  json_path?: string;
   /** Personen, Schlüssel ist ein frei wählbarer Name. Ein leerer Eintrag (`anna:`) ist null. */
   users?: Record<string, PersonConfig | null>;
   /** Kalender für alle ohne eigenen Eintrag in `users`. */
@@ -54,6 +58,8 @@ export interface AdventCalendarCardConfig {
   /** Gemeinsame Türchen für alle Personen. */
   shared?: SharedConfig | null;
 }
+
+export type ContentSource = 'yaml' | 'json';
 
 /**
  * off: nur persönliche Inhalte; merge: gemeinsamer Inhalt zusätzlich zum persönlichen;

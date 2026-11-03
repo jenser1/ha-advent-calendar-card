@@ -10,6 +10,18 @@ import {
   sharedEffectNotice,
 } from './blocks/effect';
 import {
+  SHARED_FILE,
+  contentFile,
+  fileName,
+  isComplete,
+  loadCalendarContent,
+  serverPath,
+  usesJson,
+  validateContentConfig,
+  withFileDoors,
+  type CalendarContent,
+} from './content-source';
+import {
   DOOR_COUNT,
   daysUntilDoor,
   effectiveToday,
@@ -66,12 +78,18 @@ export class AdventCalendarCard extends LitElement {
   @state() private loadFailed = false;
   /** Türchen, dessen Inhalt gerade im Dialog angezeigt wird. */
   @state() private openDay?: number;
+  /** Türchen aus den JSON-Dateien (content_source: json); undefined, solange sie nicht geladen sind. */
+  @state() private content?: CalendarContent;
 
   private _hass?: HomeAssistant;
   private dayTimer?: number;
   /** Benutzer und Schlüssel, zu denen `calendar` gehört. */
   private calendarId?: string;
   private loadRequest = 0;
+  /** Dateien, zu denen `content` gehört. */
+  private contentId?: string;
+  private contentIncomplete = false;
+  private contentRequest = 0;
   private wasConnected = false;
 
   get hass(): HomeAssistant | undefined {
@@ -132,6 +150,7 @@ export class AdventCalendarCard extends LitElement {
       }
     }
     validatePersonConfig(config);
+    validateContentConfig(config);
     this.config = config;
     this.refresh();
   }
@@ -167,10 +186,11 @@ export class AdventCalendarCard extends LitElement {
     }
   };
 
-  /** Bestimmt „heute“ neu und lädt bei Bedarf den passenden Speicherstand. */
+  /** Bestimmt „heute“ neu und lädt bei Bedarf den passenden Speicherstand und die Inhaltsdateien. */
   private refresh({ reload = false } = {}): void {
     this.refreshToday();
     void this.loadCalendar(reload);
+    void this.loadContent(reload);
   }
 
   private refreshToday(): void {
@@ -231,6 +251,41 @@ export class AdventCalendarCard extends LitElement {
     }
   }
 
+  /**
+   * Lädt bei content_source: json die Dateien des Benutzers – zu denselben Zeitpunkten
+   * wie den Speicherstand. Fehlt etwas oder ist es fehlerhaft, wird es bei jedem
+   * Prüfen (spätestens minütlich) erneut geladen.
+   */
+  private async loadContent(reload: boolean): Promise<void> {
+    const config = this.config;
+    const user = this._hass?.user;
+    const year = this.year;
+    const match = config && user ? findCalendar(config, user) : undefined;
+    if (!config || !usesJson(config) || !match || year === undefined) {
+      this.content = undefined;
+      this.contentId = undefined;
+      return;
+    }
+    const id = [
+      contentFile(config, fileName(match.person), year).url,
+      contentFile(config, SHARED_FILE, year).url,
+    ].join(' ');
+    if (!reload && !this.contentIncomplete && id === this.contentId) {
+      return;
+    }
+    if (id !== this.contentId) {
+      this.content = undefined;
+      this.contentId = id;
+      this.openDay = undefined;
+    }
+    const request = ++this.contentRequest;
+    const content = await loadCalendarContent(config, match.person, year);
+    if (request === this.contentRequest) {
+      this.content = content;
+      this.contentIncomplete = !isComplete(content);
+    }
+  }
+
   private onDoorClick(
     door: AdventCalendarDoor,
     day: number,
@@ -277,7 +332,8 @@ export class AdventCalendarCard extends LitElement {
       // Erst nach Bestätigung durch den Server: So löst ein Türchen, das schon
       // auf einem anderen Gerät geöffnet wurde, den Effekt nicht noch einmal aus.
       if (newlyOpened && match) {
-        const door = resolveDoor(config, match.calendar, day);
+        const resolved = withFileDoors(config, match.calendar, this.content);
+        const door = resolveDoor(resolved.config, resolved.calendar, day);
         const variables = { tag: day, person: match.person ?? user.name };
         const once =
           config.shared?.effect_once === false
@@ -382,16 +438,38 @@ export class AdventCalendarCard extends LitElement {
     const mode = colorMode(theme, this.darkMode);
     const snow = this.config.snow ? html`<advent-calendar-snow></advent-calendar-snow>` : nothing;
 
-    if (!match) {
+    const json = usesJson(this.config);
+    const content = json && match ? this.content : undefined;
+    // Ohne Datei keine Türchen – sonst würden sie leer geöffnet und „verbraucht“.
+    const missingFile = content?.personal.status === 'missing' ? content.personal.path : undefined;
+
+    if (!match || missingFile) {
+      const where = missingFile && serverPath(missingFile);
+      const message = match
+        ? 'Dein Kalender ist noch nicht fertig 🎅'
+        : 'Für dich gibt’s noch keinen Kalender 🎅';
       return html`
         <ha-card class="theme-${theme} ${mode}">
           ${header}
-          <div class="no-calendar">Für dich gibt’s noch keinen Kalender 🎅</div>
+          <div class="no-calendar">${message}</div>
+          ${missingFile && user?.is_admin
+            ? html`<div class="missing-file">
+                Datei fehlt: ${missingFile}${where ? html`<br />Auf dem Server: ${where}` : nothing}
+              </div>`
+            : nothing}
           ${snow}
         </ha-card>
       `;
     }
 
+    // Im JSON-Modus lassen sich Türchen erst öffnen, wenn alle Dateien fehlerfrei geladen sind.
+    const ready = !json || (content !== undefined && isComplete(content));
+    const contentErrors = content
+      ? [content.personal, content.shared].flatMap((file) =>
+          file.status === 'error' ? [file.message] : [],
+        )
+      : [];
+    const resolved = withFileDoors(this.config, match.calendar, content);
     const calendar = this.calendar;
     // Pro Benutzer und Jahr fest gemischt; solange der Benutzer unbekannt ist, 1–24.
     const days =
@@ -399,9 +477,10 @@ export class AdventCalendarCard extends LitElement {
         ? Array.from({ length: DOOR_COUNT }, (_, i) => i + 1)
         : shuffledDays(`${user.id}-${year}`);
     const openDay = this.openDay;
-    const door = openDay === undefined ? {} : resolveDoor(this.config, match.calendar, openDay);
+    const door =
+      openDay === undefined ? {} : resolveDoor(resolved.config, resolved.calendar, openDay);
     const notice = user?.is_admin
-      ? sharedEffectNotice(this.config.shared, this._hass?.states)
+      ? sharedEffectNotice(resolved.config.shared, this._hass?.states)
       : undefined;
 
     return html`
@@ -421,15 +500,17 @@ export class AdventCalendarCard extends LitElement {
         ${this.loadFailed
           ? html`<div class="error">Gespeicherter Stand konnte nicht geladen werden.</div>`
           : nothing}
+        ${contentErrors.map((message) => html`<div class="error">${message}</div>`)}
         ${notice ? html`<div class="notice">${notice}</div>` : nothing}
         <div class="doors">
           ${repeat(
             days,
             (day) => day,
             (day) => {
-              const status = calendar
-                ? getDoorStatus(day, year, today, isOpened(calendar, day))
-                : undefined;
+              const status =
+                calendar && ready
+                  ? getDoorStatus(day, year, today, isOpened(calendar, day))
+                  : undefined;
               const color = doorColor(theme, mode, day);
               return html`
                 <advent-calendar-door
@@ -568,6 +649,14 @@ export class AdventCalendarCard extends LitElement {
 
     .no-calendar:first-child {
       padding-top: 24px;
+    }
+
+    .missing-file {
+      margin: -12px 16px 24px;
+      text-align: center;
+      font-size: 0.85em;
+      overflow-wrap: anywhere;
+      color: var(--advent-muted, var(--secondary-text-color));
     }
 
     @container (min-width: 480px) {

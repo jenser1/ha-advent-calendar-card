@@ -15,6 +15,7 @@ Eine animierte Custom Lovelace Card, die jeder Person im Haushalt einen eigenen 
 - Gemeinsame Türchen für alle (zusätzlich oder statt persönlichem Inhalt)
 - Themes `winter`, `kids`, `nerd`, optionaler Schneefall
 - Visueller Editor, YAML bleibt möglich
+- Inhalte wahlweise in JSON-Dateien statt in der Dashboard-Konfiguration
 
 ## Installation
 
@@ -38,10 +39,12 @@ Die Karte lässt sich im Dashboard-Editor visuell einstellen oder per YAML – b
 
 | Tab         | Inhalt                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------- |
-| Allgemein   | Überschrift, Jahr, Theme, Schnee, Mischen, Text für leere Türchen, Testdatum (nur Admins) |
+| Allgemein   | Überschrift, Jahr, Theme, Schnee, Mischen, Text für leere Türchen, Inhaltsquelle (YAML/JSON) mit Pfad, Testdatum (nur Admins) |
 | Personen    | Personen anlegen, umbenennen, löschen; HA-Benutzer und Theme pro Person; Fallback an/aus |
-| Türchen     | Person (oder Fallback) wählen, Türchen im Raster anklicken, Bausteine hinzufügen, ausfüllen, verschieben, entfernen; „Türchen testen“ und „Effekt auslösen“ |
+| Türchen     | Person (oder Fallback) wählen, Türchen im Raster anklicken, Bausteine hinzufügen, ausfüllen, verschieben, entfernen; „Türchen testen“ und „Effekt auslösen“; Export als JSON-Datei |
 | Gemeinsam   | Modus (aus / zusätzlich / statt persönlich), „einmal pro Tag“ mit Text-Helfer, gemeinsame Türchen mit eigenem Modus pro Türchen, Test und Effekt auslösen |
+
+Mit Inhaltsquelle JSON zeigen die Tabs Türchen und Gemeinsam die Dateien nur an (siehe Inhalte aus JSON-Dateien).
 
 Personen und den Fallback mit eingetragenen Türchen löscht der Editor erst nach einer Rückfrage.
 
@@ -67,8 +70,8 @@ year: 2026
 | `fallback`   | Kalender           | –                        | Für alle ohne eigenen Eintrag in `users`            |
 | `empty_text` | Text               | „Heute ist das Türchen leer …“ | Text für Türchen ohne Inhalt                  |
 | `shared`     | gemeinsame Türchen | –                        | Türchen für alle (siehe Gemeinsame Türchen)         |
-
-Weitere Optionen folgen mit den nächsten Versionen.
+| `content_source` | `yaml`, `json` | `yaml`                   | Türchen aus der Karte oder aus JSON-Dateien (siehe Inhalte aus JSON-Dateien) |
+| `json_path`  | Pfad               | `/local/advent/{person}.json` | Wo die JSON-Dateien liegen; `{person}`, `{year}` |
 
 > **Tipp für Januar:** Ohne `year` zeigt die Karte ab dem 1. Januar den Kalender des neuen Jahres. Wer den alten Kalender noch ansehen möchte, setzt `year` auf das Vorjahr.
 
@@ -204,6 +207,52 @@ shared:
 2. In der Karte `shared.effect_helper: input_text.adventskalender` eintragen.
 
 Ohne Helfer läuft der gemeinsame Effekt bei jeder Person einmal; Admins sehen dazu einen Hinweis in der Karte. Mit `shared.effect_once: false` ist das gewollt und der Hinweis verschwindet. Öffnen zwei Personen im selben Moment, kann der Effekt trotzdem doppelt laufen. Im Testmodus schreibt die Karte `test:…` in den Helfer, damit Tests den echten Tag nicht blockieren; **Testdaten zurücksetzen** löscht diesen Test-Merker.
+
+### Inhalte aus JSON-Dateien
+
+Mit `content_source: json` stehen die Türchen nicht in der Dashboard-Konfiguration, sondern in Dateien auf dem Server. Dann sieht niemand die Inhalte, nur weil er die Karten-Konfiguration öffnet, und lange Kalender machen das Dashboard nicht unübersichtlich.
+
+```yaml
+type: custom:advent-calendar-card
+content_source: json
+users:
+  jens:
+    theme: nerd
+  anna: {}
+shared:
+  effect_helper: input_text.adventskalender
+```
+
+| Datei (Standardpfad)              | Liegt auf dem Server unter               | Inhalt                                 |
+| --------------------------------- | ---------------------------------------- | -------------------------------------- |
+| `/local/advent/jens.json`         | `/config/www/advent/jens.json`           | Türchen der Person `jens`              |
+| `/local/advent/fallback.json`     | `/config/www/advent/fallback.json`       | Fallback bzw. Kalender ohne `users`    |
+| `/local/advent/shared.json`       | `/config/www/advent/shared.json`         | gemeinsame Türchen (optional)          |
+
+Eine Datei enthält die Türchen genau wie in der YAML, nur als JSON – siehe [`examples/jens.json`](examples/jens.json) und [`examples/card.yaml`](examples/card.yaml):
+
+```json
+{
+  "doors": {
+    "1": { "text": "Wusstest du? Der erste Adventskranz hatte 24 Kerzen." },
+    "2": { "task": "Gutschein: 1x Frühstück ans Bett 🥐" },
+    "4": {
+      "text": "Schau mal ins Wohnzimmer ✨",
+      "effect": { "action": "script.turn_on", "target": { "entity_id": "script.advent_lichtshow" } }
+    }
+  }
+}
+```
+
+- Der Dateiname ist der Name der Person aus `users` – genau so geschrieben, Groß-/Kleinschreibung zählt. Die Namen `fallback` und `shared` sind deshalb im JSON-Modus für Personen tabu.
+- In `shared.json` darf ein Türchen wie in der YAML einen eigenen `mode` haben. Personen, Themes, `fallback` und die Einstellungen unter `shared` (Modus, Helfer) bleiben in der Karte. Türchen in der YAML ignoriert die Karte im JSON-Modus.
+- Mit `json_path` lässt sich der Pfad ändern: `{person}` wird durch den Namen ersetzt, `{year}` durch das Jahr, z. B. `/local/advent/{year}/{person}.json`.
+- Fehlt die Datei einer Person, zeigt die Karte „Dein Kalender ist noch nicht fertig 🎅“ statt der Türchen (Admins sehen dazu den Pfad). Fehlt `shared.json`, gibt es einfach keine gemeinsamen Türchen. Fehler in einer Datei zeigt die Karte mit Dateiname und Stelle an; Türchen lassen sich dann erst wieder öffnen, wenn alles stimmt.
+- Die Karte lädt die Dateien beim Öffnen der Ansicht frisch – geänderte Inhalte sind also ohne Neustart da. Fehlt etwas, versucht sie es jede Minute erneut.
+- Dateien ablegen geht z. B. mit dem Add-on **File editor** oder **Samba share**.
+- Der visuelle Editor kann keine Dateien schreiben: Im JSON-Modus zeigen die Tabs **Türchen** und **Gemeinsam** Pfad, Ladestatus und den Inhalt jedes Türchens, und **Türchen testen** und **Effekt auslösen** arbeiten mit dem Datei-Inhalt. Stehen noch Türchen in der YAML, macht **…json herunterladen** daraus eine fertige Datei (oder **JSON anzeigen** zum Kopieren), danach lassen sie sich mit **Aus der YAML entfernen** löschen. Den Export gibt es auch im YAML-Modus – praktisch, um einen im Editor gebauten Kalender in Dateien umzuziehen.
+
+> **Spicken:** `/local/`-Dateien kann jeder abrufen, der die Adresse kennt – auch ohne Anmeldung. Für die Familie reicht das; wirklich geheim ist der Inhalt so nicht.
 
 ### Aussehen
 

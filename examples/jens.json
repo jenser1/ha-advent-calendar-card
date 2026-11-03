@@ -1,0 +1,32 @@
+{
+  "doors": {
+    "1": {
+      "text": "Wusstest du? Der erste Adventskranz hatte 24 Kerzen.",
+      "image": "/local/advent/jens/01.gif"
+    },
+    "2": {
+      "task": "Gutschein: 1x Frühstück ans Bett 🥐"
+    },
+    "3": {
+      "link": {
+        "title": "Mein Vorrat-Add-on für Home Assistant",
+        "url": "https://github.com/jenser1/ha-vorrat-addon",
+        "kind": "github"
+      }
+    },
+    "4": {
+      "text": "Schau mal ins Wohnzimmer ✨",
+      "effect": {
+        "action": "script.turn_on",
+        "target": { "entity_id": "script.advent_lichtshow" }
+      }
+    },
+    "5": {
+      "video": "/local/advent/jens/kaminfeuer.mp4"
+    },
+    "7": {
+      "text": "Was hat viele Zähne, kann aber nicht beißen?",
+      "answer": "Ein Kamm 🪮"
+    }
+  }
+}

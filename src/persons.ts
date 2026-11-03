@@ -85,7 +85,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const THEME_LIST = THEMES.join(', ');
 const MODE_LIST = SHARED_MODES.join(', ');
 
-function validateDoors(doors: unknown, path: string, allowMode: boolean): void {
+/** Prüft Türchen 1–24 samt Bausteinen; `allowMode` erlaubt `mode` (gemeinsame Türchen). */
+export function validateDoors(doors: unknown, path: string, allowMode: boolean): void {
   if (doors == null) {
     return;
   }
