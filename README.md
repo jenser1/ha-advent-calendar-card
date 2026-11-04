@@ -1,12 +1,10 @@
 # 🎄 Adventskalender-Card für Home Assistant
 
-> **Status:** in Entwicklung, noch nicht einsatzbereit.
-
 Eine animierte Custom Lovelace Card, die jeder Person im Haushalt einen eigenen Adventskalender zeigt (1. bis 24. Dezember). Jedes Türchen lässt sich nur an seinem Tag öffnen und kann Text, Bilder/GIFs, Links, Mini-Aufgaben und Smart-Home-Effekte enthalten.
 
-<!-- TODO: Demo-GIF -->
+![Adventskalender mit Schneefall: Das heutige Türchen klappt auf und zeigt einen Spruch und einen Gutschein](https://raw.githubusercontent.com/jenser1/ha-advent-calendar-card/main/docs/demo.gif)
 
-## Funktionen (geplant)
+## Funktionen
 
 - Eigener Kalender und eigener Öffnungsstatus pro Home-Assistant-Benutzer, geräteübergreifend gespeichert
 - Türchen öffnen sich nur am jeweiligen Tag; verpasste Türchen bleiben zu
@@ -19,17 +17,40 @@ Eine animierte Custom Lovelace Card, die jeder Person im Haushalt einen eigenen 
 
 ## Installation
 
+Voraussetzung: Home Assistant 2024.11 oder neuer.
+
 ### HACS
 
-Folgt mit dem ersten Release.
+Die Karte steht nicht im HACS-Standardverzeichnis, sondern wird als benutzerdefiniertes Repository hinzugefügt:
+
+1. **HACS → ⋮ → Benutzerdefinierte Repositories**
+   - Repository: `https://github.com/jenser1/ha-advent-calendar-card`
+   - Typ: **Dashboard**
+2. In HACS nach **Adventskalender Card** suchen und herunterladen. Die Ressource trägt HACS selbst ein.
+3. Browser neu laden.
 
 ### Manuell
 
-1. `advent-calendar-card.js` nach `/config/www/` kopieren.
+1. `advent-calendar-card.js` aus dem [neuesten Release](https://github.com/jenser1/ha-advent-calendar-card/releases/latest) nach `/config/www/` kopieren.
 2. **Einstellungen → Dashboards → ⋮ → Ressourcen → Ressource hinzufügen**
    - URL: `/local/advent-calendar-card.js`
    - Typ: **JavaScript-Modul**
-3. Browser neu laden und die Karte zum Dashboard hinzufügen.
+3. Browser neu laden.
+
+## Schnellstart
+
+1. Dashboard bearbeiten, **Karte hinzufügen** und **Adventskalender** wählen.
+2. Im Tab **Personen** für jede Person einen Eintrag anlegen und den HA-Benutzer wählen.
+3. Im Tab **Türchen** die Person wählen, ein Türchen anklicken und Bausteine hinzufügen.
+4. Ausprobieren, ohne bis Dezember zu warten: Im Tab **Allgemein** ein Testdatum setzen (siehe Testmodus).
+
+Fertige Vorlagen liegen in [`examples/`](examples):
+
+| Datei                                       | Inhalt                                                                  |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| [`card.yaml`](examples/card.yaml)           | Karte mit zwei Personen, Fallback und Inhalten aus JSON-Dateien          |
+| [`jens.json`](examples/jens.json)           | Beispiel-Datei mit Türchen für eine Person                               |
+| [`scripts.yaml`](examples/scripts.yaml)     | Beispiel-Scripts für Effekte: Lichtshow, Weihnachtsmusik, Nikolaus       |
 
 ## Konfiguration
 
@@ -310,3 +331,19 @@ npm run watch      # baut bei jeder Änderung neu (unminifiziert)
 npm test           # Vitest
 npm run typecheck  # TypeScript-Prüfung inkl. Tests
 ```
+
+### Release
+
+`dist/` liegt nicht im Repository. Ein Tag `vX.Y.Z` startet die GitHub Action: Sie prüft, ob der Tag zur Version in `package.json` passt, lässt Typecheck und Tests laufen, baut die Karte, hängt `advent-calendar-card.js` an ein neues Release und prüft das Repository mit der HACS-Validierung.
+
+```bash
+npm version 0.12.0
+```
+
+```bash
+git push --follow-tags
+```
+
+## Lizenz
+
+[MIT](LICENSE)

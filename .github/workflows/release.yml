@@ -1,0 +1,44 @@
+# Ein Tag wie v0.11.0 baut die Karte und hängt sie an ein GitHub-Release.
+# HACS lädt advent-calendar-card.js aus dem neuesten Release; dist/ liegt nicht im Repo.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Tag muss zur Version in package.json passen
+        run: test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Release mit der fertigen Karte anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/advent-calendar-card.js
+          --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+
+  # Erst hier gibt es die JS-Datei, die HACS im Release erwartet.
+  hacs:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: plugin
