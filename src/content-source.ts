@@ -1,3 +1,4 @@
+import type { CommunityCalendar } from './edition';
 import { validateDoors } from './persons';
 import type {
   AdventCalendarCardConfig,
@@ -185,6 +186,70 @@ export function withFileDoors(
     config: { ...config, shared: { ...(config.shared ?? {}), doors: doorsOf(content?.shared) } },
     calendar: { ...calendar, doors: doorsOf(content?.personal) },
   };
+}
+
+/** Optionen, die es in der Community-Edition nicht gibt: Dort sehen alle denselben Kalender. */
+export const COMMUNITY_LOCKED_OPTIONS = [
+  'year',
+  'users',
+  'fallback',
+  'shared',
+  'content_source',
+  'json_path',
+] as const;
+
+/** Wirft eine verständliche Meldung, wenn die Config gesperrte Optionen enthält. */
+export function validateCommunityConfig(
+  config: AdventCalendarCardConfig,
+  calendar: CommunityCalendar,
+): void {
+  const locked = COMMUNITY_LOCKED_OPTIONS.find((key) => config[key] !== undefined);
+  if (locked === 'year') {
+    throw new Error(`„year“ gibt es in der Community-Edition nicht – sie zeigt immer den Kalender ${calendar.year}.`);
+  }
+  if (locked) {
+    throw new Error(
+      `„${locked}“ gibt es in der Community-Edition ${calendar.year} noch nicht – eigene Kalender kommen ${calendar.year + 1}.`,
+    );
+  }
+}
+
+/**
+ * Prüft die Inhalte der Community-Edition ({ "year": …, "doors": { … } }). Effekte sind
+ * verboten: Sie würden Dienste im Home Assistant fremder Leute aufrufen.
+ */
+export function validateCommunityCalendar(data: unknown): CommunityCalendar {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    throw new Error('Die Inhalte müssen ein Objekt sein, z. B. { "year": 2026, "doors": { … } }.');
+  }
+  const unknown = Object.keys(data).find((key) => key !== 'year' && key !== 'doors');
+  if (unknown) {
+    throw new Error(`„${unknown}“ gibt es nicht, erlaubt sind „year“ und „doors“.`);
+  }
+  const { year, doors } = data as { year?: unknown; doors?: unknown };
+  if (typeof year !== 'number' || !Number.isInteger(year) || year < 2000 || year > 2100) {
+    throw new Error('„year“ muss eine Jahreszahl sein, z. B. 2026.');
+  }
+  validateDoors(doors, 'doors', false);
+  for (const [day, door] of Object.entries((doors ?? {}) as Doors)) {
+    if (door?.effect !== undefined) {
+      throw new Error(`„doors.${day}.effect“: Effekte sind in Community-Inhalten nicht erlaubt.`);
+    }
+  }
+  return { year, doors: (doors ?? {}) as Doors };
+}
+
+/** Türchen der Community-Edition ohne Effekte – zur Sicherheit auch, wenn die Prüfung umgangen wurde. */
+export function communityDoors(calendar: CommunityCalendar): Doors {
+  return Object.fromEntries(
+    Object.entries(calendar.doors).map(([day, door]) => {
+      if (!door) {
+        return [day, door];
+      }
+      const { effect: _effect, ...content } = door;
+      return [day, content];
+    }),
+  );
 }
 
 /** Datei-Inhalt zum Herunterladen: leere Türchen fallen weg, Reihenfolge 1–24. */

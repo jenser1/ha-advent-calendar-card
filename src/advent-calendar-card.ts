@@ -11,12 +11,14 @@ import {
 } from './blocks/effect';
 import {
   SHARED_FILE,
+  communityDoors,
   contentFile,
   fileName,
   isComplete,
   loadCalendarContent,
   serverPath,
   usesJson,
+  validateCommunityConfig,
   validateContentConfig,
   withFileDoors,
   type CalendarContent,
@@ -35,6 +37,7 @@ import {
 } from './date-logic';
 import { OPEN_ANIMATION_MS, type AdventCalendarDoor } from './door';
 import { DEFAULT_EMPTY_TEXT } from './door-dialog';
+import { COMMUNITY_CALENDAR } from './edition';
 import { EDITOR_TAG } from './editor/advent-calendar-card-editor';
 import {
   findCalendar,
@@ -69,6 +72,22 @@ export const CARD_TAG = 'advent-calendar-card';
 
 // So oft wird geprüft, ob ein neuer Tag begonnen hat (z. B. Wandtablet über Mitternacht).
 const DAY_CHECK_INTERVAL_MS = 60_000;
+
+const COMMUNITY_DOORS = COMMUNITY_CALENDAR && communityDoors(COMMUNITY_CALENDAR);
+
+/**
+ * Kalender des Benutzers. In der Community-Edition sehen alle denselben; solange
+ * der Benutzer unbekannt ist, wird neutral angezeigt.
+ */
+function calendarFor(
+  config: AdventCalendarCardConfig,
+  user: HomeAssistant['user'],
+): CalendarMatch | undefined {
+  if (COMMUNITY_DOORS) {
+    return { calendar: { doors: COMMUNITY_DOORS } };
+  }
+  return user ? findCalendar(config, user) : { calendar: {} };
+}
 
 export class AdventCalendarCard extends LitElement {
   @state() private config?: AdventCalendarCardConfig;
@@ -133,6 +152,9 @@ export class AdventCalendarCard extends LitElement {
   setConfig(config: AdventCalendarCardConfig): void {
     if (!config) {
       throw new Error('Ungültige Konfiguration.');
+    }
+    if (COMMUNITY_CALENDAR) {
+      validateCommunityConfig(config, COMMUNITY_CALENDAR);
     }
     const { year, debug_date: debugDate } = config;
     if (year !== undefined && (!Number.isInteger(year) || year < 2000 || year > 2100)) {
@@ -207,7 +229,7 @@ export class AdventCalendarCard extends LitElement {
   }
 
   private get year(): number | undefined {
-    return this.today && (this.config?.year ?? this.today.date.year);
+    return this.today && (COMMUNITY_CALENDAR?.year ?? this.config?.year ?? this.today.date.year);
   }
 
   private get storageKey(): string | undefined {
@@ -319,7 +341,7 @@ export class AdventCalendarCard extends LitElement {
       return;
     }
     const config = this.config;
-    const match = findCalendar(config, user);
+    const match = calendarFor(config, user);
     const year = this.year!;
     const test = this.today!.debug;
     // Sofort anzeigen, Speichern läuft im Hintergrund.
@@ -429,10 +451,8 @@ export class AdventCalendarCard extends LitElement {
     const title = this.config.title ?? `Adventskalender ${year}`;
     const header = title ? html`<h1 class="card-header">${title}</h1>` : nothing;
     const user = this._hass?.user;
-    // Solange der Benutzer unbekannt ist, wird neutral angezeigt (calendar ist dann auch undefined).
-    const match: CalendarMatch | undefined = user
-      ? findCalendar(this.config, user)
-      : { calendar: {} };
+    // Solange der Benutzer unbekannt ist, ist auch calendar undefined: Türchen bleiben neutral.
+    const match = calendarFor(this.config, user);
 
     const theme = resolveTheme(match?.calendar.theme, this.config.theme);
     const mode = colorMode(theme, this.darkMode);
@@ -676,13 +696,16 @@ if (!customElements.get(CARD_TAG)) {
   window.customCards.push({
     type: CARD_TAG,
     name: 'Adventskalender',
-    description: 'Ein eigener Adventskalender für jede Person im Haushalt.',
+    description: COMMUNITY_CALENDAR
+      ? `Der Community-Adventskalender ${COMMUNITY_CALENDAR.year} – jeden Tag ein neues Türchen.`
+      : 'Ein eigener Adventskalender für jede Person im Haushalt.',
     preview: true,
     documentationURL: 'https://github.com/jenser1/ha-advent-calendar-card',
   });
 
+  const edition = COMMUNITY_CALENDAR ? ` Community ${COMMUNITY_CALENDAR.year}` : '';
   console.info(
-    `%c ADVENT-CALENDAR-CARD %c v${version} `,
+    `%c ADVENT-CALENDAR-CARD %c v${version}${edition} `,
     'color: #fff; background: #b71c1c; font-weight: 700;',
     'color: #b71c1c; background: #fff; font-weight: 700;',
   );

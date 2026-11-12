@@ -1,5 +1,6 @@
 import { LitElement, css, html } from 'lit';
 import { property, state } from 'lit/decorators.js';
+import { COMMUNITY_CALENDAR } from '../edition';
 import type { AdventCalendarCardConfig, HomeAssistant } from '../types';
 import { fireConfigChanged, loadHaFormComponents } from './shared';
 import './tab-doors';
@@ -11,12 +12,15 @@ export const EDITOR_TAG = 'advent-calendar-card-editor';
 
 type Tab = 'general' | 'persons' | 'doors' | 'shared';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'general', label: 'Allgemein' },
-  { id: 'persons', label: 'Personen' },
-  { id: 'doors', label: 'Türchen' },
-  { id: 'shared', label: 'Gemeinsam' },
-];
+// In der Community-Edition gibt es keine eigenen Kalender, also nur „Allgemein“.
+const TABS: { id: Tab; label: string }[] = COMMUNITY_CALENDAR
+  ? [{ id: 'general', label: 'Allgemein' }]
+  : [
+      { id: 'general', label: 'Allgemein' },
+      { id: 'persons', label: 'Personen' },
+      { id: 'doors', label: 'Türchen' },
+      { id: 'shared', label: 'Gemeinsam' },
+    ];
 
 /**
  * Visueller Editor der Karte. Jeder Tab ist ein eigenes Element, das bei Änderungen
@@ -46,6 +50,10 @@ export class AdventCalendarCardEditor extends LitElement {
   static styles = css`
     :host {
       display: block;
+    }
+
+    .tabs[hidden] {
+      display: none;
     }
 
     .tabs {
@@ -92,7 +100,7 @@ export class AdventCalendarCardEditor extends LitElement {
       return html``;
     }
     return html`
-      <div class="tabs" role="tablist">
+      <div class="tabs" role="tablist" ?hidden=${TABS.length < 2}>
         ${TABS.map(
           (tab) => html`
             <button

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Echte Inhalte der Community-Edition – kommen nie ins Repo (Spoiler).
+content/2026.json
 coverage/
 *.log
 .DS_Store

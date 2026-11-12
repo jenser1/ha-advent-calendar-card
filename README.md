@@ -326,18 +326,26 @@ Voraussetzung: Node.js 22.12 oder neuer.
 
 ```bash
 npm install
-npm run build      # erzeugt dist/advent-calendar-card.js
-npm run watch      # baut bei jeder Änderung neu (unminifiziert)
-npm test           # Vitest
-npm run typecheck  # TypeScript-Prüfung inkl. Tests
+npm run build       # Community-Edition → dist/advent-calendar-card.js
+npm run build:full  # volle Edition mit eigenen Kalendern
+npm run watch       # baut bei jeder Änderung neu (unminifiziert)
+npm test            # Vitest, deckt beide Editionen ab
+npm run typecheck   # TypeScript-Prüfung inkl. Tests
 ```
+
+### Editionen
+
+- **Community-Edition 2026** (`npm run build`): Die Türchen stecken fest in der Karte, alle sehen denselben Kalender. Die Inhalte kommen beim Bauen aus `content/2026.json`. Die Datei liegt nicht im Repository; fehlt sie, baut die Karte mit dem Platzhalter `content/beispiel.json` und warnt. `users`, `fallback`, `shared`, `content_source`, `json_path` und `year` führen zu einer Fehlermeldung, der Editor zeigt nur „Allgemein“. Effekte sind in den Inhalten verboten: Der Build bricht ab, und die Karte würde sie zusätzlich ignorieren.
+- **Volle Edition** (`npm run build:full`): eigene Kalender pro Person, wie in dieser Anleitung beschrieben – geplant für 2027.
+
+Eine andere Inhaltsdatei lässt sich zum Testen mit `ADVENT_CONTENT` angeben, z. B. `npx rollup -c --environment ADVENT_CONTENT:content/test.json`.
 
 ### Release
 
 `dist/` liegt nicht im Repository. Ein Tag `vX.Y.Z` startet die GitHub Action: Sie prüft, ob der Tag zur Version in `package.json` passt, lässt Typecheck und Tests laufen, baut die Karte, hängt `advent-calendar-card.js` an ein neues Release und prüft das Repository mit der HACS-Validierung.
 
 ```bash
-npm version 0.12.0
+npm version 0.13.0
 ```
 
 ```bash

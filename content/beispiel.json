@@ -1,0 +1,31 @@
+{
+  "year": 2026,
+  "doors": {
+    "1": {
+      "text": "Beispielinhalt: Die echten Türchen der Community-Edition kommen aus content/2026.json."
+    },
+    "2": {
+      "link": {
+        "title": "Home Assistant",
+        "url": "https://www.home-assistant.io/",
+        "description": "Die offizielle Seite von Home Assistant"
+      }
+    },
+    "3": {
+      "text": "Was hat viele Tasten, kann aber nicht schließen?",
+      "answer": "Eine Tastatur ⌨️"
+    },
+    "6": {
+      "text": "Nikolaus! Schau mal in deine Stiefel 🥾",
+      "task": "Gutschein: Heute ein Dashboard aufräumen 🧹"
+    },
+    "24": {
+      "link": {
+        "title": "Home Assistant Core",
+        "url": "https://github.com/home-assistant/core",
+        "kind": "github"
+      },
+      "text": "Frohe Weihnachten! 🎄"
+    }
+  }
+}

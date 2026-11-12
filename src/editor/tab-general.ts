@@ -9,6 +9,7 @@ import {
 } from '../content-source';
 import { parseDebugDate } from '../date-logic';
 import { DEFAULT_EMPTY_TEXT } from '../door-dialog';
+import { COMMUNITY_CALENDAR } from '../edition';
 import { DEFAULT_THEME, isThemeName } from '../themes';
 import type { AdventCalendarCardConfig, ContentSource, HomeAssistant } from '../types';
 import {
@@ -107,16 +108,22 @@ export class AdventCalendarEditorGeneral extends LitElement {
 
   private get schema(): FormField[] {
     const hideTitle = this.config.title === '';
+    // Community-Edition: Jahr und Inhalte stehen fest.
+    const ownContent = !COMMUNITY_CALENDAR;
     return [
       { name: 'title', selector: { text: {} }, disabled: hideTitle },
       { name: 'hide_title', selector: { boolean: {} } },
-      { name: 'year', selector: { number: { min: 2000, max: 2100, mode: 'box' } } },
+      ...(ownContent
+        ? [{ name: 'year', selector: { number: { min: 2000, max: 2100, mode: 'box' } } }]
+        : []),
       { name: 'theme', selector: { select: { mode: 'dropdown', options: THEME_OPTIONS } } },
       { name: 'snow', selector: { boolean: {} } },
       { name: 'shuffle', selector: { boolean: {} } },
       { name: 'empty_text', selector: { text: { multiline: true } } },
-      { name: 'content_source', selector: { select: { mode: 'dropdown', options: SOURCE_OPTIONS } } },
-      ...(this.config.content_source === 'json'
+      ...(ownContent
+        ? [{ name: 'content_source', selector: { select: { mode: 'dropdown', options: SOURCE_OPTIONS } } }]
+        : []),
+      ...(ownContent && this.config.content_source === 'json'
         ? [{ name: 'json_path', selector: { text: {} } }]
         : []),
       ...(this.isAdmin ? [{ name: 'debug_date', selector: { date: {} } }] : []),
@@ -179,8 +186,15 @@ export class AdventCalendarEditorGeneral extends LitElement {
   }
 
   render() {
+    const community = COMMUNITY_CALENDAR;
     return html`
       <div class="section">
+        ${community
+          ? html`<p class="intro community">
+              Community-Edition ${community.year}: Alle sehen denselben Kalender. Eigene
+              Kalender mit eigenen Türchen kommen ${community.year + 1}.
+            </p>`
+          : nothing}
         <ha-form
           .hass=${this.hass}
           .data=${this.data}
