@@ -194,7 +194,7 @@ doors:
 - Fehlt ein Script oder eine Entität, oder schlägt der Aufruf fehl, zeigt die Karte einen Hinweis. Das Türchen ist trotzdem geöffnet.
 - Effekte laufen auch im Testmodus; nach **Testdaten zurücksetzen** lösen sie erneut aus.
 - Effekte laufen über `hass.callService` mit den Rechten des angemeldeten Benutzers. Scripts dürfen auch Nicht-Admins starten.
-- Beispiel-Scripts für Lichtshow, Weihnachtsmusik und Nikolaus stehen in [`examples/scripts.yaml`](examples/scripts.yaml).
+- Beispiel-Scripts für Lichtshow, Weihnachtsmusik, Nikolaus und einen eigenen Effekt für alle Türchen (Licht und Musik über Music Assistant) stehen in [`examples/scripts.yaml`](examples/scripts.yaml).
 - Tipp: Schreib zu einem Effekt einen `text` dazu – sonst zeigt der Dialog `empty_text`.
 
 #### Eigener Effekt für alle Türchen

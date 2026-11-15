@@ -13,6 +13,64 @@
 #       text: "Schau mal ins Wohnzimmer ✨"
 #       effect:
 #         action: script.advent_lichtshow
+#
+# Oder ein eigener Effekt für alle Türchen (auch in der Community-Edition):
+#   type: custom:advent-calendar-card
+#   effect:
+#     action: script.advent_tuerchen
+
+advent_tuerchen:
+  alias: "Advent – Türchen geöffnet"
+  icon: mdi:calendar-star
+  mode: queued
+  fields:
+    tag:
+      description: "Nummer des Türchens (1–24), kommt von der Karte"
+    person:
+      description: "Wer das Türchen geöffnet hat, kommt von der Karte"
+  sequence:
+    # Bei jedem Türchen: Licht kurz aufblinken lassen.
+    - action: light.turn_on
+      target:
+        entity_id: light.wohnzimmer
+      data:
+        flash: short
+    - choose:
+        # Nikolaus und Heiligabend: Weihnachtslied über Music Assistant.
+        - conditions:
+            - condition: template
+              value_template: "{{ tag | int(0) in [6, 24] }}"
+          sequence:
+            - action: media_player.volume_set
+              target:
+                entity_id: media_player.wohnzimmer
+              data:
+                volume_level: 0.3
+            - action: music_assistant.play_media
+              target:
+                entity_id: media_player.wohnzimmer
+              data:
+                media_id: "Last Christmas"
+                media_type: track
+                enqueue: replace
+        # 3. und 4. Advent 2026 (13. und 20.12.): Lichteffekt. Der 2. Advent ist der 6. – dort läuft schon Musik.
+        - conditions:
+            - condition: template
+              value_template: "{{ tag | int(0) in [13, 20] }}"
+          sequence:
+            # Welche Effekte es gibt, steht in den Attributen der Lampe (effect_list),
+            # z. B. bei WLED „Rainbow“ oder „Fireworks“.
+            - action: light.turn_on
+              target:
+                entity_id: light.wohnzimmer
+              data:
+                effect: "Rainbow"
+      # Alle anderen Tage: nur eine kleine Nachricht.
+      default:
+        - action: persistent_notification.create
+          data:
+            title: "🎄 Türchen {{ tag }}"
+            message: "{{ person | default('Jemand') }} hat Türchen {{ tag }} geöffnet."
 
 advent_lichtshow:
   alias: "Advent – Lichtshow"
