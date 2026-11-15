@@ -12,7 +12,7 @@ export interface HomeAssistant {
   };
   language: string;
   /** Zustände aller Entitäten, Schlüssel ist die entity_id. */
-  states?: Record<string, { state: string }>;
+  states?: Record<string, { state: string; attributes?: Record<string, unknown> }>;
   /** Verfügbare Dienste: domain → service → Beschreibung. */
   services?: Record<string, Record<string, unknown>>;
   /** darkMode: HA zeigt gerade das dunkle Design. */
@@ -52,6 +52,10 @@ export interface AdventCalendarCardConfig {
    * Community-Edition). Scripts bekommen tag und person mit.
    */
   effect?: EffectConfig;
+  /** Einfacher Lichteffekt bei jedem Türchen (im Editor ohne YAML einstellbar). */
+  effect_light?: LightEffectConfig;
+  /** Einfache Musik beim Öffnen, auf Wunsch nur an bestimmten Türchen. */
+  effect_music?: MusicEffectConfig;
   /** Woher die Türchen kommen: aus dieser Config (Standard) oder aus JSON-Dateien. */
   content_source?: ContentSource;
   /** Pfad der JSON-Dateien mit {person} und optional {year}; Standard /local/advent/{person}.json. */
@@ -129,6 +133,34 @@ export interface EffectCall {
 }
 
 export type EffectConfig = EffectCall | EffectCall[];
+
+/** flash: Lampe kurz aufblinken lassen; effect: einen Lichteffekt der Lampe starten (effect_list). */
+export type LightMode = 'flash' | 'effect';
+
+export interface LightEffectConfig {
+  /** Lampe, z. B. light.wohnzimmer; ohne Lampe passiert nichts. */
+  entity_id?: string;
+  /** Standard: flash. */
+  mode?: LightMode;
+  /** Name des Lichteffekts bei mode: effect, z. B. „Rainbow“. */
+  effect?: string;
+}
+
+/** music_assistant: Titel/Name über Music Assistant; media_player: Datei- oder Stream-Adresse. */
+export type MusicPlayer = 'music_assistant' | 'media_player';
+
+export interface MusicEffectConfig {
+  /** Mediaplayer, z. B. media_player.wohnzimmer; ohne Player oder Titel passiert nichts. */
+  entity_id?: string;
+  /** Standard: media_player. */
+  player?: MusicPlayer;
+  /** Titel (Music Assistant) oder Adresse der Datei/des Streams. */
+  media_id?: string;
+  /** Lautstärke in Prozent (0–100); leer lässt sie, wie sie ist. */
+  volume?: number;
+  /** Nur an diesen Türchen (1–24); leer = an jedem Türchen. */
+  days?: number[];
+}
 
 export interface CalendarConfig {
   theme?: ThemeName;

@@ -10,6 +10,7 @@ import {
   sharedEffectNotice,
   validateEffect,
 } from './blocks/effect';
+import { runSimpleEffects, validateSimpleEffects } from './blocks/simple-effect';
 import {
   SHARED_FILE,
   communityDoors,
@@ -170,6 +171,7 @@ export class AdventCalendarCard extends LitElement {
     if (config.effect != null) {
       validateEffect(config.effect, 'effect');
     }
+    validateSimpleEffects(config);
     for (const option of ['snow', 'shuffle'] as const) {
       if (config[option] !== undefined && typeof config[option] !== 'boolean') {
         throw new Error(`„${option}“ muss true oder false sein.`);
@@ -369,6 +371,8 @@ export class AdventCalendarCard extends LitElement {
           Promise.all([
             // Eigener Effekt aus der Karten-Config: bei jedem Türchen, auch ohne Inhalt.
             runEffects(hass, config.effect, variables),
+            // Licht und Musik aus dem Editor (effect_light, effect_music).
+            runSimpleEffects(hass, config, variables),
             runEffects(hass, door.personal?.effect, variables),
             runSharedEffects(hass, door.shared?.effect, variables, once),
           ]),

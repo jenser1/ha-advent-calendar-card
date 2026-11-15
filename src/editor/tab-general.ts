@@ -11,7 +11,15 @@ import { parseDebugDate } from '../date-logic';
 import { DEFAULT_EMPTY_TEXT } from '../door-dialog';
 import { COMMUNITY_CALENDAR } from '../edition';
 import { DEFAULT_THEME, isThemeName } from '../themes';
-import type { AdventCalendarCardConfig, ContentSource, EffectCall, HomeAssistant } from '../types';
+import type { AdventCalendarCardConfig, ContentSource, HomeAssistant } from '../types';
+import {
+  EFFECT_HELPERS,
+  EFFECT_LABELS,
+  applyEffectForm,
+  effectFormData,
+  effectFormSchema,
+  type EffectFormData,
+} from './effect-form';
 import {
   THEME_OPTIONS,
   editorStyles,
@@ -28,7 +36,6 @@ interface GeneralData {
   snow: boolean;
   shuffle: boolean;
   empty_text: string;
-  effect: EffectCall[];
   content_source: ContentSource;
   json_path: string;
   debug_date?: string;
@@ -42,7 +49,6 @@ const LABELS: Record<string, string> = {
   snow: 'Schneefall',
   shuffle: 'Türchen mischen',
   empty_text: 'Text für leere Türchen',
-  effect: 'Eigener Effekt beim ersten Öffnen (freiwillig)',
   content_source: 'Inhaltsquelle',
   json_path: 'Pfad der Dateien',
   debug_date: 'Testdatum (nur für Admins)',
@@ -54,8 +60,6 @@ const HELPERS: Record<string, string> = {
   theme: 'Gilt für alle, die im Tab „Personen“ kein eigenes Theme haben.',
   shuffle: 'Jede Person bekommt eine eigene, feste Reihenfolge.',
   empty_text: `Leer lassen für „${DEFAULT_EMPTY_TEXT}“`,
-  effect:
-    'Läuft in deinem Home Assistant, wenn ein Türchen zum ersten Mal geöffnet wird – bei jedem Türchen, auch ohne Inhalt. Scripts bekommen tag (Nummer des Türchens) und person mit. Leer lassen für keinen Effekt.',
   content_source:
     'JSON-Dateien halten die Inhalte aus der Dashboard-Konfiguration heraus. Personen, Themes und Einstellungen bleiben hier.',
   json_path: `{person} = Name aus „Personen“ (dazu „${FALLBACK_FILE}“ und „${SHARED_FILE}“ für Fallback und gemeinsame Türchen), {year} = Jahr. /local/ ist der Ordner /config/www/.`,
@@ -104,7 +108,6 @@ export class AdventCalendarEditorGeneral extends LitElement {
       snow: config.snow ?? false,
       shuffle: config.shuffle ?? true,
       empty_text: config.empty_text ?? '',
-      effect: Array.isArray(config.effect) ? config.effect : config.effect ? [config.effect] : [],
       content_source: config.content_source ?? 'yaml',
       json_path: this.pathDraft?.value ?? config.json_path ?? DEFAULT_JSON_PATH,
       debug_date: debugDateValue(config.debug_date),
@@ -125,7 +128,6 @@ export class AdventCalendarEditorGeneral extends LitElement {
       { name: 'snow', selector: { boolean: {} } },
       { name: 'shuffle', selector: { boolean: {} } },
       { name: 'empty_text', selector: { text: { multiline: true } } },
-      { name: 'effect', selector: { action: {} } },
       ...(ownContent
         ? [{ name: 'content_source', selector: { select: { mode: 'dropdown', options: SOURCE_OPTIONS } } }]
         : []),
@@ -151,16 +153,18 @@ export class AdventCalendarEditorGeneral extends LitElement {
     setOrDelete(next, 'snow', value.snow ? true : undefined);
     setOrDelete(next, 'shuffle', value.shuffle === false ? false : undefined);
     setOrDelete(next, 'empty_text', value.empty_text?.trim() ? value.empty_text : undefined);
-    setOrDelete(
-      next,
-      'effect',
-      Array.isArray(value.effect) && value.effect.length > 0 ? value.effect : undefined,
-    );
     this.applySource(next, value.content_source);
     this.applyPath(next, value.json_path);
     if (this.isAdmin) {
       setOrDelete(next, 'debug_date', value.debug_date || undefined);
     }
+    fireConfigChanged(this, next);
+  }
+
+  private onEffectChanged(event: CustomEvent<{ value: EffectFormData }>): void {
+    event.stopPropagation();
+    const next: AdventCalendarCardConfig = { ...this.config };
+    applyEffectForm(next, event.detail.value, this.hass);
     fireConfigChanged(this, next);
   }
 
@@ -216,6 +220,22 @@ export class AdventCalendarEditorGeneral extends LitElement {
         ></ha-form>
         ${this.sourceError ? html`<p class="error-text source-error">${this.sourceError}</p>` : nothing}
         ${this.pathDraft ? html`<p class="error-text path-error">${this.pathDraft.error}</p>` : nothing}
+        <div class="box effect-box">
+          <div class="box-header">Effekt beim ersten Öffnen (freiwillig)</div>
+          <p class="hint">
+            Läuft in deinem Home Assistant, wenn ein Türchen zum ersten Mal geöffnet wird – bei
+            jedem Türchen, auch ohne Inhalt.
+          </p>
+          <ha-form
+            class="effect-form"
+            .hass=${this.hass}
+            .data=${effectFormData(this.config, this.hass)}
+            .schema=${effectFormSchema(this.config, this.hass)}
+            .computeLabel=${(field: FormField) => EFFECT_LABELS[field.name] ?? field.name}
+            .computeHelper=${(field: FormField) => EFFECT_HELPERS[field.name]}
+            @value-changed=${this.onEffectChanged}
+          ></ha-form>
+        </div>
       </div>
     `;
   }

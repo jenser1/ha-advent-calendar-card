@@ -91,6 +91,8 @@ year: 2026
 | `fallback`   | Kalender           | –                        | Für alle ohne eigenen Eintrag in `users`            |
 | `empty_text` | Text               | „Heute ist das Türchen leer …“ | Text für Türchen ohne Inhalt                  |
 | `effect`     | Aktion(en)         | –                        | Eigener Effekt beim ersten Öffnen jedes Türchens (siehe Effekte) |
+| `effect_light` | Licht            | –                        | Lampe blinkt oder startet einen Lichteffekt bei jedem Türchen (siehe Licht und Musik ohne YAML) |
+| `effect_music` | Musik            | –                        | Musik beim Öffnen, auf Wunsch nur an bestimmten Türchen (siehe Licht und Musik ohne YAML) |
 | `shared`     | gemeinsame Türchen | –                        | Türchen für alle (siehe Gemeinsame Türchen)         |
 | `content_source` | `yaml`, `json` | `yaml`                   | Türchen aus der Karte oder aus JSON-Dateien (siehe Inhalte aus JSON-Dateien) |
 | `json_path`  | Pfad               | `/local/advent/{person}.json` | Wo die JSON-Dateien liegen; `{person}`, `{year}` |
@@ -197,9 +199,34 @@ doors:
 - Beispiel-Scripts für Lichtshow, Weihnachtsmusik, Nikolaus und einen eigenen Effekt für alle Türchen (Licht und Musik über Music Assistant) stehen in [`examples/scripts.yaml`](examples/scripts.yaml).
 - Tipp: Schreib zu einem Effekt einen `text` dazu – sonst zeigt der Dialog `empty_text`.
 
+#### Licht und Musik ohne YAML
+
+Im visuellen Editor gibt es im Tab „Allgemein“ den Bereich **Effekt beim ersten Öffnen**. Dort wählst du einfach aus – ganz ohne Script:
+
+- **Licht:** eine Lampe, die bei jedem Türchen kurz blinkt oder einen Lichteffekt startet. Die Effekte kommen aus der Liste der Lampe (z. B. bei WLED „Rainbow“).
+- **Musik:** ein Mediaplayer, ein Titel und auf Wunsch Lautstärke und Türchen (z. B. nur am 6. und 24.). Abspielen geht über Music Assistant (Name von Titel, Album oder Playlist) oder über den normalen Mediaplayer (Adresse einer Datei oder eines Streams).
+
+In YAML sieht das so aus:
+
+```yaml
+type: custom:advent-calendar-card
+effect_light:
+  entity_id: light.wohnzimmer
+  mode: effect          # flash (Standard) = kurz blinken, effect = Lichteffekt
+  effect: Rainbow
+effect_music:
+  entity_id: media_player.wohnzimmer
+  player: music_assistant   # oder media_player (Standard)
+  media_id: Last Christmas
+  volume: 30                # Prozent, weglassen = Lautstärke bleibt
+  days: [6, 24]             # weglassen = an jedem Türchen
+```
+
+Licht und Musik laufen wie alle Effekte nur beim ersten Öffnen und auch in der Community-Edition. Wer mehr will, nimmt zusätzlich **Erweitert: eigene Aktionen** (Option `effect`, siehe unten).
+
 #### Eigener Effekt für alle Türchen
 
-Mit `effect` direkt in der Karte läuft **ein** Effekt beim ersten Öffnen jedes Türchens – auch bei Türchen ohne Inhalt und zusätzlich zu Effekten einzelner Türchen. Das ist freiwillig und funktioniert auch in der Community-Edition; im visuellen Editor steht er im Tab „Allgemein“.
+Mit `effect` direkt in der Karte läuft **ein** Effekt beim ersten Öffnen jedes Türchens – auch bei Türchen ohne Inhalt und zusätzlich zu Effekten einzelner Türchen. Das ist freiwillig und funktioniert auch in der Community-Edition; im visuellen Editor steht er im Tab „Allgemein“ unter „Erweitert: eigene Aktionen“.
 
 ```yaml
 type: custom:advent-calendar-card
@@ -369,7 +396,7 @@ npm run typecheck   # TypeScript-Prüfung inkl. Tests
 
 ### Editionen
 
-- **Community-Edition 2026** (`npm run build`): Die Türchen stecken fest in der Karte, alle sehen denselben Kalender. Die Inhalte kommen beim Bauen aus `content/2026.json`. Die Datei liegt nicht im Repository; fehlt sie, baut die Karte mit dem Platzhalter `content/beispiel.json` und warnt. `users`, `fallback`, `shared`, `content_source`, `json_path` und `year` führen zu einer Fehlermeldung, der Editor zeigt nur „Allgemein“. Effekte sind in den Inhalten verboten: Der Build bricht ab, und die Karte würde sie zusätzlich ignorieren. Erlaubt ist nur der eigene Effekt (`effect`), den jeder selbst in seiner Karte einstellt.
+- **Community-Edition 2026** (`npm run build`): Die Türchen stecken fest in der Karte, alle sehen denselben Kalender. Die Inhalte kommen beim Bauen aus `content/2026.json`. Die Datei liegt nicht im Repository; fehlt sie, baut die Karte mit dem Platzhalter `content/beispiel.json` und warnt. `users`, `fallback`, `shared`, `content_source`, `json_path` und `year` führen zu einer Fehlermeldung, der Editor zeigt nur „Allgemein“. Effekte sind in den Inhalten verboten: Der Build bricht ab, und die Karte würde sie zusätzlich ignorieren. Erlaubt sind nur eigene Effekte (`effect_light`, `effect_music`, `effect`), die jeder selbst in seiner Karte einstellt.
 - **Volle Edition** (`npm run build:full`): eigene Kalender pro Person, wie in dieser Anleitung beschrieben – geplant für 2027.
 
 Eine andere Inhaltsdatei lässt sich zum Testen mit `ADVENT_CONTENT` angeben, z. B. `npx rollup -c --environment ADVENT_CONTENT:content/test.json`.
