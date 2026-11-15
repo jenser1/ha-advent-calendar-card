@@ -53,6 +53,28 @@ describe('Community-Edition', () => {
     expect(hass.serviceCalls).toEqual([]);
   });
 
+  it('löst nur den eigenen Effekt aus der Karten-Config aus, nie den aus den Inhalten', async () => {
+    setNow('2026-12-06T12:00:00Z');
+    const hass = mockHass({
+      userName: 'Gast',
+      services: ['script.turn_on', 'script.mein_advent'],
+      entities: ['script.fremd', 'script.mein_advent'],
+    });
+    const card = await renderCard({ effect: { action: 'script.mein_advent' } }, hass);
+
+    await openDoor(card, 6);
+
+    expect(hass.serviceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'mein_advent',
+        data: { tag: 6, person: 'Gast' },
+        target: undefined,
+        notifyOnError: false,
+      },
+    ]);
+  });
+
   it('speichert den Stand weiter pro Benutzer und Jahr', async () => {
     setNow('2026-12-06T12:00:00Z');
     const hass = mockHass();

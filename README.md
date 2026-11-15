@@ -90,6 +90,7 @@ year: 2026
 | `users`      | Personen           | –                        | Ein Kalender pro Person (siehe Personen)            |
 | `fallback`   | Kalender           | –                        | Für alle ohne eigenen Eintrag in `users`            |
 | `empty_text` | Text               | „Heute ist das Türchen leer …“ | Text für Türchen ohne Inhalt                  |
+| `effect`     | Aktion(en)         | –                        | Eigener Effekt beim ersten Öffnen jedes Türchens (siehe Effekte) |
 | `shared`     | gemeinsame Türchen | –                        | Türchen für alle (siehe Gemeinsame Türchen)         |
 | `content_source` | `yaml`, `json` | `yaml`                   | Türchen aus der Karte oder aus JSON-Dateien (siehe Inhalte aus JSON-Dateien) |
 | `json_path`  | Pfad               | `/local/advent/{person}.json` | Wo die JSON-Dateien liegen; `{person}`, `{year}` |
@@ -195,6 +196,39 @@ doors:
 - Effekte laufen über `hass.callService` mit den Rechten des angemeldeten Benutzers. Scripts dürfen auch Nicht-Admins starten.
 - Beispiel-Scripts für Lichtshow, Weihnachtsmusik und Nikolaus stehen in [`examples/scripts.yaml`](examples/scripts.yaml).
 - Tipp: Schreib zu einem Effekt einen `text` dazu – sonst zeigt der Dialog `empty_text`.
+
+#### Eigener Effekt für alle Türchen
+
+Mit `effect` direkt in der Karte läuft **ein** Effekt beim ersten Öffnen jedes Türchens – auch bei Türchen ohne Inhalt und zusätzlich zu Effekten einzelner Türchen. Das ist freiwillig und funktioniert auch in der Community-Edition; im visuellen Editor steht er im Tab „Allgemein“.
+
+```yaml
+type: custom:advent-calendar-card
+effect:
+  action: script.advent_tuerchen
+```
+
+Das Script bekommt `tag` und `person` und entscheidet selbst, was passiert, z. B. am 6. und 24. etwas Besonderes:
+
+```yaml
+script:
+  advent_tuerchen:
+    fields:
+      tag: {}
+      person: {}
+    sequence:
+      - choose:
+          - conditions: "{{ tag | int in [6, 24] }}"
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: light.wohnzimmer
+                data:
+                  flash: long
+        default:
+          - action: notify.notify
+            data:
+              message: "{{ person }} hat Türchen {{ tag }} geöffnet 🎄"
+```
 
 ### Gemeinsame Türchen
 
@@ -335,7 +369,7 @@ npm run typecheck   # TypeScript-Prüfung inkl. Tests
 
 ### Editionen
 
-- **Community-Edition 2026** (`npm run build`): Die Türchen stecken fest in der Karte, alle sehen denselben Kalender. Die Inhalte kommen beim Bauen aus `content/2026.json`. Die Datei liegt nicht im Repository; fehlt sie, baut die Karte mit dem Platzhalter `content/beispiel.json` und warnt. `users`, `fallback`, `shared`, `content_source`, `json_path` und `year` führen zu einer Fehlermeldung, der Editor zeigt nur „Allgemein“. Effekte sind in den Inhalten verboten: Der Build bricht ab, und die Karte würde sie zusätzlich ignorieren.
+- **Community-Edition 2026** (`npm run build`): Die Türchen stecken fest in der Karte, alle sehen denselben Kalender. Die Inhalte kommen beim Bauen aus `content/2026.json`. Die Datei liegt nicht im Repository; fehlt sie, baut die Karte mit dem Platzhalter `content/beispiel.json` und warnt. `users`, `fallback`, `shared`, `content_source`, `json_path` und `year` führen zu einer Fehlermeldung, der Editor zeigt nur „Allgemein“. Effekte sind in den Inhalten verboten: Der Build bricht ab, und die Karte würde sie zusätzlich ignorieren. Erlaubt ist nur der eigene Effekt (`effect`), den jeder selbst in seiner Karte einstellt.
 - **Volle Edition** (`npm run build:full`): eigene Kalender pro Person, wie in dieser Anleitung beschrieben – geplant für 2027.
 
 Eine andere Inhaltsdatei lässt sich zum Testen mit `ADVENT_CONTENT` angeben, z. B. `npx rollup -c --environment ADVENT_CONTENT:content/test.json`.

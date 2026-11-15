@@ -8,6 +8,7 @@ import {
   setHelperValue,
   sharedEffectMarker,
   sharedEffectNotice,
+  validateEffect,
 } from './blocks/effect';
 import {
   SHARED_FILE,
@@ -165,6 +166,9 @@ export class AdventCalendarCard extends LitElement {
     }
     if (config.empty_text !== undefined && typeof config.empty_text !== 'string') {
       throw new Error('„empty_text“ muss ein Text sein.');
+    }
+    if (config.effect != null) {
+      validateEffect(config.effect, 'effect');
     }
     for (const option of ['snow', 'shuffle'] as const) {
       if (config[option] !== undefined && typeof config[option] !== 'boolean') {
@@ -363,6 +367,8 @@ export class AdventCalendarCard extends LitElement {
             : { helper: config.shared?.effect_helper, marker: sharedEffectMarker(year, day, test) };
         void this.reportEffectErrors(
           Promise.all([
+            // Eigener Effekt aus der Karten-Config: bei jedem Türchen, auch ohne Inhalt.
+            runEffects(hass, config.effect, variables),
             runEffects(hass, door.personal?.effect, variables),
             runSharedEffects(hass, door.shared?.effect, variables, once),
           ]),

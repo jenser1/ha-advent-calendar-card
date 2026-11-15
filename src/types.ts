@@ -47,6 +47,11 @@ export interface AdventCalendarCardConfig {
   shuffle?: boolean;
   /** Text im Dialog, wenn für ein Türchen kein Inhalt eingetragen ist. */
   empty_text?: string;
+  /**
+   * Eigener Effekt beim ersten Öffnen jedes Türchens (freiwillig, auch in der
+   * Community-Edition). Scripts bekommen tag und person mit.
+   */
+  effect?: EffectConfig;
   /** Woher die Türchen kommen: aus dieser Config (Standard) oder aus JSON-Dateien. */
   content_source?: ContentSource;
   /** Pfad der JSON-Dateien mit {person} und optional {year}; Standard /local/advent/{person}.json. */
