@@ -74,7 +74,8 @@ Im Editor gibt es im Bereich **Effekt beim ersten Öffnen**:
 
 - **Licht:** eine Lampe, die bei jedem Türchen kurz blinkt oder einen Lichteffekt startet. Die Effekte kommen aus der Liste der Lampe (z. B. bei WLED „Rainbow“).
 - **Musik:** ein Mediaplayer, ein Titel und auf Wunsch Lautstärke und Türchen (z. B. nur am 6. und 24.). Abspielen geht über Music Assistant (Titel, Album oder Playlist aus deiner Bibliothek oder die volle Adresse einer Datei) oder über den normalen Mediaplayer (Adresse einer Datei oder eines Streams).
-- **Eigene MP3-Datei:** nach `/config/www/advent/` legen (am besten ohne Leerzeichen im Namen) und mit **voller** Adresse eintragen, z. B. `http://homeassistant.local:8123/local/advent/lied.mp3`. Nur der Dateiname oder `/local/…` reicht nicht, weil der Lautsprecher die Datei selbst abholen muss.
+- **Aus Medien auswählen (am einfachsten):** Klick dich wie unter „Medien“ in Home Assistant zu deiner Datei, Playlist oder Radiostation durch. Eigene Lieder lädst du vorher unter **Medien → Lokale Medien** hoch. Die Karte übernimmt Player, Medium und Art (`media_type`) selbst und stellt auf „Mediaplayer“.
+- **Eigene MP3-Datei von Hand:** nach `/config/www/advent/` legen (am besten ohne Leerzeichen im Namen) und mit **voller** Adresse eintragen, z. B. `http://homeassistant.local:8123/local/advent/lied.mp3`. Nur der Dateiname oder `/local/…` reicht nicht, weil der Lautsprecher die Datei selbst abholen muss.
 - **Erweitert: eigene Aktionen:** beliebige Aktionen oder ein Script, wie bei Automationen. Scripts bekommen `tag` (Nummer des Türchens) und `person` mit. Ein Beispiel steht in [`examples/scripts.yaml`](examples/scripts.yaml) (`advent_tuerchen`).
 
 ```yaml
@@ -89,6 +90,16 @@ effect_music:
   media_id: Last Christmas
   volume: 30                # Prozent, weglassen = Lautstärke bleibt
   days: [6, 24]             # weglassen = an jedem Türchen
+```
+
+Aus der Medienauswahl sieht das z. B. so aus:
+
+```yaml
+effect_music:
+  entity_id: media_player.wohnzimmer
+  player: media_player
+  media_id: media-source://media_source/local/advent/weihnachtsbaum.mp3
+  media_type: audio/mpeg    # Art des Mediums, Standard: music
 ```
 
 Effekte laufen nur beim **ersten** Öffnen eines Türchens und nur mit dem, was du selbst eingestellt hast. Die Inhalte des Kalenders können in deinem Home Assistant nichts auslösen.

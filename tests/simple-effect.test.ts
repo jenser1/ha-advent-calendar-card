@@ -165,6 +165,7 @@ describe('Editor: Effekt-Bereich im Tab „Allgemein“', () => {
       'light_entity',
       'music_entity',
       'music_player',
+      'music_pick',
       'music_media',
       'music_volume',
       'music_days',
@@ -182,6 +183,73 @@ describe('Editor: Effekt-Bereich im Tab „Allgemein“', () => {
 
     await change(editor, forms(editor)[1], { music_entity: undefined });
     expect(last(changes)).toEqual({ type: TYPE });
+  });
+
+  it('übernimmt Player, Medium und Art aus der Medienauswahl', async () => {
+    const { editor, changes } = await renderEditor(
+      { effect_music: { entity_id: 'media_player.wohnzimmer', player: 'music_assistant', media_id: 'Last Christmas' } },
+      { hass: home() },
+    );
+    expect(forms(editor)[1].data.music_pick).toEqual({ entity_id: 'media_player.wohnzimmer' });
+
+    await change(editor, forms(editor)[1], {
+      music_pick: {
+        entity_id: 'media_player.kueche',
+        media_content_id: 'media-source://media_source/local/advent/baum.mp3',
+        media_content_type: 'audio/mpeg',
+        metadata: { title: 'baum.mp3' },
+      },
+    });
+    expect(last(changes).effect_music).toEqual({
+      entity_id: 'media_player.kueche',
+      player: 'media_player',
+      media_id: 'media-source://media_source/local/advent/baum.mp3',
+      media_type: 'audio/mpeg',
+    });
+    expect(forms(editor)[1].data.music_pick).toEqual({
+      entity_id: 'media_player.kueche',
+      media_content_id: 'media-source://media_source/local/advent/baum.mp3',
+      media_content_type: 'audio/mpeg',
+    });
+
+    // Lautstärke ändern behält die Auswahl.
+    await change(editor, forms(editor)[1], { music_volume: 40 });
+    expect(last(changes).effect_music?.media_type).toBe('audio/mpeg');
+
+    // Von Hand getippt: Die Art passt nicht mehr und fällt weg.
+    await change(editor, forms(editor)[1], { music_media: 'http://ha:8123/local/lied.mp3' });
+    expect(last(changes).effect_music).toEqual({
+      entity_id: 'media_player.kueche',
+      player: 'media_player',
+      media_id: 'http://ha:8123/local/lied.mp3',
+      volume: 40,
+    });
+  });
+
+  it('übernimmt einen in der Medienauswahl gewechselten Player', async () => {
+    const { editor, changes } = await renderEditor(
+      { effect_music: { entity_id: 'media_player.wohnzimmer', player: 'media_player' } },
+      { hass: home() },
+    );
+
+    await change(editor, forms(editor)[1], { music_pick: { entity_id: 'media_player.kueche' } });
+    expect(last(changes).effect_music).toEqual({ entity_id: 'media_player.kueche', player: 'media_player' });
+  });
+
+  it('spielt Ausgewähltes mit der passenden Art ab', () => {
+    expect(
+      musicCalls({ entity_id: 'media_player.a', media_id: 'media-source://x/baum.mp3', media_type: 'audio/mpeg' }, 1),
+    ).toEqual([
+      {
+        action: 'media_player.play_media',
+        target: { entity_id: 'media_player.a' },
+        data: { media_content_id: 'media-source://x/baum.mp3', media_content_type: 'audio/mpeg' },
+      },
+    ]);
+    const card = document.createElement('advent-calendar-card');
+    expect(() =>
+      card.setConfig({ type: TYPE, effect_music: { entity_id: 'media_player.a', media_type: 3 } } as never),
+    ).toThrow('„effect_music.media_type“ muss ein Text sein.');
   });
 
   it('nimmt ohne Music Assistant den normalen Mediaplayer', async () => {

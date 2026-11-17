@@ -156,6 +156,8 @@ export interface MusicEffectConfig {
   player?: MusicPlayer;
   /** Titel (Music Assistant) oder Adresse der Datei/des Streams. */
   media_id?: string;
+  /** Art des Mediums für den Mediaplayer (media_content_type), z. B. audio/mpeg; Standard: music. Setzt die Medienauswahl im Editor. */
+  media_type?: string;
   /** Lautstärke in Prozent (0–100); leer lässt sie, wie sie ist. */
   volume?: number;
   /** Nur an diesen Türchen (1–24); leer = an jedem Türchen. */

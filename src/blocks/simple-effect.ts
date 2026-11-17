@@ -61,12 +61,13 @@ export function validateSimpleEffects(config: AdventCalendarCardConfig): void {
     if (!isRecord(music)) {
       throw new Error('„effect_music“ braucht z. B. „entity_id: media_player.wohnzimmer“ und „media_id“.');
     }
-    checkKeys(music, 'effect_music', ['entity_id', 'player', 'media_id', 'volume', 'days']);
+    checkKeys(music, 'effect_music', ['entity_id', 'player', 'media_id', 'media_type', 'volume', 'days']);
     checkEntity(music.entity_id, 'effect_music', 'media_player');
     if (music.player !== undefined && !MUSIC_PLAYERS.includes(music.player as never)) {
       throw new Error('„effect_music.player“ muss „music_assistant“ oder „media_player“ sein.');
     }
     checkText(music.media_id, 'effect_music.media_id');
+    checkText(music.media_type, 'effect_music.media_type');
     const volume = music.volume;
     if (volume !== undefined && (typeof volume !== 'number' || volume < 0 || volume > 100)) {
       throw new Error('„effect_music.volume“ muss eine Zahl von 0 bis 100 sein (Prozent).');
@@ -116,7 +117,7 @@ export function musicCalls(music: MusicEffectConfig | undefined, day: number): E
       : {
           action: 'media_player.play_media',
           target,
-          data: { media_content_id: media, media_content_type: 'music' },
+          data: { media_content_id: media, media_content_type: music.media_type?.trim() || 'music' },
         },
   );
   return calls;

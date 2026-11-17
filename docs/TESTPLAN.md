@@ -51,7 +51,9 @@ Mit `debug_date: "2026-12-24"`:
 - [ ] Licht „Kurz blinken“: Lampe blinkt beim ersten Öffnen, nicht beim erneuten Ansehen
 - [ ] Licht „Lichteffekt starten“: Liste zeigt die Effekte der Lampe, Effekt startet
 - [ ] Musik über Music Assistant mit Titelnamen und Lautstärke
-- [ ] Musik über normalen Mediaplayer mit Datei-Adresse (z. B. `/local/…mp3`)
+- [ ] Musik über normalen Mediaplayer mit voller Datei-Adresse (`http://…/local/…mp3`)
+- [ ] „Aus Medien auswählen“: Datei aus „Lokale Medien“ wählen, Player und Titel werden eingetragen, Lied spielt
+- [ ] „Aus Medien auswählen“ mit einem Music-Assistant-Player (Playlist oder Radio)
 - [ ] Musik nur an bestimmten Türchen: an anderen Türchen keine Musik, Licht trotzdem
 - [ ] „Erweitert: eigene Aktionen“ mit `script.advent_tuerchen` aus `examples/scripts.yaml`: bekommt `tag` und `person`
 - [ ] Nicht-Admin öffnet ein Türchen: Effekte laufen auch bei ihm

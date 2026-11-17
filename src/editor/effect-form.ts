@@ -9,6 +9,14 @@ import type {
 } from '../types';
 import { setOrDelete, type FormField } from './shared';
 
+/** Wert der Medienauswahl von HA (Selector „media“). */
+export interface MediaPick {
+  entity_id?: string;
+  media_content_id?: string;
+  media_content_type?: string;
+  metadata?: Record<string, unknown>;
+}
+
 /** Daten des Formulars „Effekt beim ersten Öffnen“ im Tab „Allgemein“. */
 export interface EffectFormData {
   light_entity?: string;
@@ -16,6 +24,7 @@ export interface EffectFormData {
   light_effect?: string;
   music_entity?: string;
   music_player?: MusicPlayer;
+  music_pick?: MediaPick;
   music_media?: string;
   music_volume?: number;
   music_days?: string[];
@@ -28,6 +37,7 @@ export const EFFECT_LABELS: Record<string, string> = {
   light_effect: 'Lichteffekt',
   music_entity: 'Musik auf',
   music_player: 'Abspielen über',
+  music_pick: 'Aus Medien auswählen',
   music_media: 'Titel oder Adresse',
   music_volume: 'Lautstärke',
   music_days: 'Musik an welchen Türchen',
@@ -38,6 +48,8 @@ export const EFFECT_HELPERS: Record<string, string> = {
   light_entity: 'Bei jedem Türchen. Leer lassen für kein Licht.',
   light_effect: 'Effekte aus der Liste der Lampe, z. B. bei WLED „Rainbow“.',
   music_entity: 'Leer lassen für keine Musik.',
+  music_pick:
+    'Am einfachsten: durch deine Medien klicken – eigene Dateien (Medien → Lokale Medien), Music Assistant, Radio. Trägt Titel und Art selbst ein und stellt auf „Mediaplayer“.',
   music_media:
     'Music Assistant: Titel, Album oder Playlist aus deiner Bibliothek (z. B. „Last Christmas“) oder die volle Adresse einer Datei (http://…). Mediaplayer: Adresse einer Datei oder eines Streams. Eigene Dateien nach /config/www/ legen und mit voller Adresse eintragen, z. B. http://homeassistant.local:8123/local/advent/lied.mp3 – am besten ohne Leerzeichen im Namen.',
   music_volume: 'Leer lassen, um die Lautstärke nicht zu ändern.',
@@ -72,6 +84,21 @@ function effectList(hass: HomeAssistant | undefined, entity: string | undefined)
   return Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string') : [];
 }
 
+/** Was die Medienauswahl anzeigt: Player und – beim Mediaplayer – das gewählte Medium. */
+function mediaPick(music: MusicEffectConfig | undefined): MediaPick | undefined {
+  if (!music?.entity_id) {
+    return undefined;
+  }
+  if (music.player === 'music_assistant' || !music.media_id) {
+    return { entity_id: music.entity_id };
+  }
+  return {
+    entity_id: music.entity_id,
+    media_content_id: music.media_id,
+    media_content_type: music.media_type ?? 'music',
+  };
+}
+
 export function effectFormData(
   config: AdventCalendarCardConfig,
   hass: HomeAssistant | undefined,
@@ -84,6 +111,7 @@ export function effectFormData(
     light_effect: light?.effect,
     music_entity: music?.entity_id,
     music_player: music?.player ?? defaultPlayer(hass),
+    music_pick: mediaPick(music),
     music_media: music?.media_id,
     music_volume: music?.volume,
     music_days: (music?.days ?? []).map(String),
@@ -119,6 +147,7 @@ export function effectFormSchema(
   if (music?.entity_id) {
     fields.push(
       { name: 'music_player', selector: { select: { mode: 'dropdown', options: MUSIC_PLAYER_OPTIONS } } },
+      { name: 'music_pick', selector: { media: {} } },
       { name: 'music_media', selector: { text: {} } },
       {
         name: 'music_volume',
@@ -145,16 +174,40 @@ function lightConfig(value: EffectFormData): LightEffectConfig | undefined {
   return light;
 }
 
-function musicConfig(value: EffectFormData, hass: HomeAssistant | undefined): MusicEffectConfig | undefined {
-  if (!value.music_entity) {
+function musicConfig(
+  value: EffectFormData,
+  hass: HomeAssistant | undefined,
+  previous: MusicEffectConfig | undefined,
+): MusicEffectConfig | undefined {
+  let entity = value.music_entity;
+  let player = value.music_player ?? defaultPlayer(hass);
+  let media = value.music_media?.trim() || undefined;
+  let type = previous?.media_type;
+  const pick = value.music_pick;
+  // Player in der Medienauswahl gewechselt.
+  if (pick?.entity_id && pick.entity_id !== previous?.entity_id) {
+    entity = pick.entity_id;
+  }
+  const picked = pick?.media_content_id && pick.media_content_id !== mediaPick(previous)?.media_content_id;
+  if (picked) {
+    // Aus Medien gewählt: Die IDs gehören zu media_player.play_media dieses Players.
+    entity = pick.entity_id ?? entity;
+    player = 'media_player';
+    media = pick.media_content_id;
+    type = pick.media_content_type || undefined;
+  } else if (media !== previous?.media_id) {
+    // Von Hand getippt: Die Art aus einer früheren Auswahl passt nicht mehr.
+    type = undefined;
+  }
+  if (!entity) {
     return undefined;
   }
-  const music: MusicEffectConfig = {
-    entity_id: value.music_entity,
-    player: value.music_player ?? defaultPlayer(hass),
-  };
-  if (value.music_media?.trim()) {
-    music.media_id = value.music_media.trim();
+  const music: MusicEffectConfig = { entity_id: entity, player };
+  if (media) {
+    music.media_id = media;
+  }
+  if (type && player === 'media_player' && media) {
+    music.media_type = type;
   }
   if (typeof value.music_volume === 'number') {
     music.volume = value.music_volume;
@@ -176,7 +229,7 @@ export function applyEffectForm(
   hass: HomeAssistant | undefined,
 ): void {
   setOrDelete(next, 'effect_light', lightConfig(value));
-  setOrDelete(next, 'effect_music', musicConfig(value, hass));
+  setOrDelete(next, 'effect_music', musicConfig(value, hass, next.effect_music));
   setOrDelete(
     next,
     'effect',
