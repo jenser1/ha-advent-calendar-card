@@ -39,7 +39,7 @@ export const EFFECT_HELPERS: Record<string, string> = {
   light_effect: 'Effekte aus der Liste der Lampe, z. B. bei WLED „Rainbow“.',
   music_entity: 'Leer lassen für keine Musik.',
   music_media:
-    'Music Assistant: Name von Titel, Album oder Playlist, z. B. „Last Christmas“. Mediaplayer: Adresse einer Datei oder eines Streams.',
+    'Music Assistant: Titel, Album oder Playlist aus deiner Bibliothek (z. B. „Last Christmas“) oder die volle Adresse einer Datei (http://…). Mediaplayer: Adresse einer Datei oder eines Streams. Eigene Dateien nach /config/www/ legen und mit voller Adresse eintragen, z. B. http://homeassistant.local:8123/local/advent/lied.mp3 – am besten ohne Leerzeichen im Namen.',
   music_volume: 'Leer lassen, um die Lautstärke nicht zu ändern.',
   music_days: 'Leer lassen für jedes Türchen.',
   effect:

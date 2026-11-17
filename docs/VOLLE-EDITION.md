@@ -204,7 +204,7 @@ doors:
 Im visuellen Editor gibt es im Tab „Allgemein“ den Bereich **Effekt beim ersten Öffnen**. Dort wählst du einfach aus – ganz ohne Script:
 
 - **Licht:** eine Lampe, die bei jedem Türchen kurz blinkt oder einen Lichteffekt startet. Die Effekte kommen aus der Liste der Lampe (z. B. bei WLED „Rainbow“).
-- **Musik:** ein Mediaplayer, ein Titel und auf Wunsch Lautstärke und Türchen (z. B. nur am 6. und 24.). Abspielen geht über Music Assistant (Name von Titel, Album oder Playlist) oder über den normalen Mediaplayer (Adresse einer Datei oder eines Streams).
+- **Musik:** ein Mediaplayer, ein Titel und auf Wunsch Lautstärke und Türchen (z. B. nur am 6. und 24.). Abspielen geht über Music Assistant (Titel, Album oder Playlist aus deiner Bibliothek oder die volle Adresse einer Datei) oder über den normalen Mediaplayer (Adresse einer Datei oder eines Streams). Eigene MP3-Dateien nach `/config/www/advent/` legen und mit voller Adresse eintragen, z. B. `http://homeassistant.local:8123/local/advent/lied.mp3`.
 
 In YAML sieht das so aus:
 
