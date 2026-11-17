@@ -11,7 +11,7 @@ export const DEFAULT_EMPTY_TEXT = 'Heute ist das Türchen leer – schön, dass 
  * Modal mit dem Inhalt eines Türchens. Nutzt das native <dialog>-Element statt
  * HA-interner Komponenten, damit es über HA-Versionen hinweg stabil bleibt.
  *
- * Events: `dialog-closed`, `task-toggle` (detail: { day, done, shared }).
+ * Events: `advent-dialog-close`, `task-toggle` (detail: { day, done, shared }).
  */
 type Section = 'shared' | 'personal';
 
@@ -125,7 +125,7 @@ export class AdventCalendarDialog extends LitElement {
   /** Schließen per ✕, Escape oder Klick auf den abgedunkelten Hintergrund. */
   private requestClose(): void {
     if (this.open) {
-      this.dispatchEvent(new CustomEvent('dialog-closed', { bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent('advent-dialog-close'));
     }
   }
 

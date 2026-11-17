@@ -150,7 +150,7 @@ describe('Effekte beim Öffnen', () => {
 
     card.shadowRoot!.querySelector<HTMLButtonElement>('.reset')!.click();
     await settle(card);
-    card.shadowRoot!.querySelector('advent-calendar-dialog')!.dispatchEvent(new CustomEvent('dialog-closed'));
+    card.shadowRoot!.querySelector('advent-calendar-dialog')!.dispatchEvent(new CustomEvent('advent-dialog-close'));
     await settle(card);
     await clickDoor(card, 5);
 

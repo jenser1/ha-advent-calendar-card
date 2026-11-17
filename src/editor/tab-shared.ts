@@ -267,7 +267,7 @@ export class AdventCalendarEditorShared extends LitElement {
         .day=${this.day}
         .sharedContent=${door ? preview : null}
         .emptyText=${this.config.empty_text ?? DEFAULT_EMPTY_TEXT}
-        @dialog-closed=${() => (this.previewOpen = false)}
+        @advent-dialog-close=${() => (this.previewOpen = false)}
         @task-toggle=${(event: Event) => event.stopPropagation()}
       ></advent-calendar-dialog>
     `;

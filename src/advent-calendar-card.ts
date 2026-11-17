@@ -570,7 +570,7 @@ export class AdventCalendarCard extends LitElement {
           .emptyText=${this.config.empty_text ?? DEFAULT_EMPTY_TEXT}
           .taskDone=${!!calendar && openDay !== undefined && isDone(calendar, openDay)}
           .sharedTaskDone=${!!calendar && openDay !== undefined && isDone(calendar, openDay, true)}
-          @dialog-closed=${() => (this.openDay = undefined)}
+          @advent-dialog-close=${() => (this.openDay = undefined)}
           @task-toggle=${this.onTaskToggle}
         ></advent-calendar-dialog>
         ${snow}

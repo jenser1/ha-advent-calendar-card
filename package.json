@@ -1,6 +1,6 @@
 {
   "name": "ha-advent-calendar-card",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "Animierte Adventskalender-Karte für Home Assistant (Lovelace Custom Card)",
   "private": true,
   "type": "module",

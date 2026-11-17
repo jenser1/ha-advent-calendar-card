@@ -77,6 +77,25 @@ describe('Dialog öffnen und schließen', () => {
     expect(dialogOf(card).open).toBe(false);
   });
 
+  it('meldet das Schließen nicht an Home Assistant (HAs eigenes „dialog-closed“ erwartet detail.dialog)', async () => {
+    const { card } = await cardWith({ 5: { text: 'Hallo' } });
+    const escaped: string[] = [];
+    const listen = (event: Event) => escaped.push(event.type);
+    for (const type of ['dialog-closed', 'advent-dialog-close']) {
+      document.addEventListener(type, listen);
+    }
+    await clickDoor(card, 5);
+
+    dialogOf(card).shadowRoot!.querySelector<HTMLButtonElement>('.close')!.click();
+    await settle(card);
+
+    for (const type of ['dialog-closed', 'advent-dialog-close']) {
+      document.removeEventListener(type, listen);
+    }
+    expect(escaped).toEqual([]);
+    expect(dialogOf(card).open).toBe(false);
+  });
+
   it('schließt per ✕ und entfernt den Inhalt (stoppt z. B. Videos)', async () => {
     const { card } = await cardWith({ 5: { video: 'https://youtu.be/dQw4w9WgXcQ' } });
     await clickDoor(card, 5);
