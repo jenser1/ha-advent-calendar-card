@@ -399,14 +399,18 @@ npm run typecheck   # TypeScript-Prüfung inkl. Tests
 - **Community-Edition 2026** (`npm run build`): Die Türchen stecken fest in der Karte, alle sehen denselben Kalender. Die Inhalte kommen beim Bauen aus `content/2026.json`. Die Datei liegt nicht im Repository; fehlt sie, baut die Karte mit dem Platzhalter `content/beispiel.json` und warnt. `users`, `fallback`, `shared`, `content_source`, `json_path` und `year` führen zu einer Fehlermeldung, der Editor zeigt nur „Allgemein“. Effekte sind in den Inhalten verboten: Der Build bricht ab, und die Karte würde sie zusätzlich ignorieren. Erlaubt sind nur eigene Effekte (`effect_light`, `effect_music`, `effect`), die jeder selbst in seiner Karte einstellt.
 - **Volle Edition** (`npm run build:full`): eigene Kalender pro Person, wie in dieser Anleitung beschrieben – geplant für 2027.
 
-Eine andere Inhaltsdatei lässt sich zum Testen mit `ADVENT_CONTENT` angeben, z. B. `npx rollup -c --environment ADVENT_CONTENT:content/test.json`.
+Eine andere Inhaltsdatei lässt sich zum Testen mit `ADVENT_CONTENT` angeben, z. B. `npx rollup -c --environment ADVENT_CONTENT:content/test.json`. Mit `ADVENT_REQUIRE_CONTENT=1` bricht der Build ab, wenn nur der Beispielinhalt da ist, und nennt die noch leeren Türchen.
+
+Die Türchen stehen in der fertigen JS-Datei leicht verschleiert (XOR + Base64) und werden erst beim Laden im Browser entschlüsselt. Das verhindert nur, dass man beim Durchblättern der Datei alle Überraschungen sieht – ein Schutz ist es nicht.
 
 ### Release
 
-`dist/` liegt nicht im Repository. Ein Tag `vX.Y.Z` startet die GitHub Action: Sie prüft, ob der Tag zur Version in `package.json` passt, lässt Typecheck und Tests laufen, baut die Karte, hängt `advent-calendar-card.js` an ein neues Release und prüft das Repository mit der HACS-Validierung.
+`dist/` liegt nicht im Repository. Ein Tag `vX.Y.Z` startet die GitHub Action: Sie prüft, ob der Tag zur Version in `package.json` passt, schreibt die echten Inhalte aus dem Secret `ADVENT_CONTENT_2026` nach `content/2026.json`, lässt Typecheck und Tests laufen, baut die Karte mit `ADVENT_REQUIRE_CONTENT=1`, hängt `advent-calendar-card.js` an ein neues Release und prüft das Repository mit der HACS-Validierung. Fehlt das Secret oder ist es kein gültiges JSON, gibt es kein Release.
+
+Das Secret einmalig anlegen: im Repository unter **Settings → Secrets and variables → Actions → New repository secret**, Name `ADVENT_CONTENT_2026`, Wert = der komplette Inhalt von `content/2026.json`. Nach jeder Änderung an den Inhalten das Secret aktualisieren.
 
 ```bash
-npm version 0.13.0
+npm version 0.15.0
 ```
 
 ```bash

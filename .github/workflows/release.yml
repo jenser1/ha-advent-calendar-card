@@ -23,10 +23,26 @@ jobs:
           cache: npm
       - name: Tag muss zur Version in package.json passen
         run: test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+      # Die echten Türchen liegen nicht im Repo, sondern im Secret ADVENT_CONTENT_2026
+      # (Inhalt von content/2026.json). Ohne Secret bricht das Release hier ab.
+      - name: Inhalte aus dem Secret holen
+        env:
+          ADVENT_CONTENT_2026: ${{ secrets.ADVENT_CONTENT_2026 }}
+        run: |
+          if [ -z "$ADVENT_CONTENT_2026" ]; then
+            echo "::error::Secret ADVENT_CONTENT_2026 fehlt – ohne echte Inhalte gibt es kein Release."
+            exit 1
+          fi
+          printf '%s' "$ADVENT_CONTENT_2026" > content/2026.json
+          node -e "JSON.parse(require('fs').readFileSync('content/2026.json','utf8').replace(/^﻿/,''))" \
+            || { echo "::error::ADVENT_CONTENT_2026 ist kein gültiges JSON."; exit 1; }
       - run: npm ci
       - run: npm run typecheck
+      # Prüft auch content/2026.json (tests/community-content.test.ts).
       - run: npm test
       - run: npm run build
+        env:
+          ADVENT_REQUIRE_CONTENT: '1'
       - name: Release mit der fertigen Karte anlegen
         env:
           GH_TOKEN: ${{ github.token }}
