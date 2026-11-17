@@ -1,0 +1,16 @@
+name: 💡 Idee oder Wunsch
+description: Vorschlag für die Karte oder den Kalender 2027.
+labels: [idee]
+body:
+  - type: textarea
+    id: idee
+    attributes:
+      label: Deine Idee
+      description: Was wünschst du dir, und wofür würdest du es nutzen?
+    validations:
+      required: true
+  - type: textarea
+    id: zusatz
+    attributes:
+      label: Noch etwas?
+      description: Beispiele, Bilder oder Links zu ähnlichen Karten.

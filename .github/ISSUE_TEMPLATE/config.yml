@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Anleitung und häufige Fragen
+    url: https://github.com/jenser1/ha-advent-calendar-card#readme
+    about: Installation, Einstellungen, Testmodus und Antworten auf häufige Fragen.
