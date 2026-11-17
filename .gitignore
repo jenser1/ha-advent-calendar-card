@@ -8,3 +8,6 @@ coverage/
 Thumbs.db
 # Screenshots fuer Kanaele (zeigen Inhalte) – nicht ins Repo.
 screenshots/
+
+# Demo-Version fuer Kanaele (enthaelt Inhalte) – nicht ins Repo.
+demo/
