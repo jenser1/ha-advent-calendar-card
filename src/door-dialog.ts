@@ -2,6 +2,7 @@ import { LitElement, css, html, nothing, type PropertyValues, type TemplateResul
 import { property, query, state } from 'lit/decorators.js';
 import { blockStyles, hasVisibleContent, renderBlocks } from './blocks';
 import { parseVideo } from './blocks/video';
+import { candleStyles, renderAdventCandles } from './advent-candles';
 import type { DoorContent } from './types';
 
 export const DIALOG_TAG = 'advent-calendar-dialog';
@@ -114,31 +115,6 @@ export class AdventCalendarDialog extends LitElement {
         text-align: center;
       }
 
-      .candles .flames {
-        display: flex;
-        flex-direction: column;
-        font-size: 1.5em;
-        line-height: 1.15;
-      }
-
-      .candles .flame {
-        display: inline-block;
-        animation: flicker 2.4s ease-in-out infinite;
-        transform-origin: 50% 90%;
-      }
-
-      .candles .flame:nth-child(2) {
-        animation-delay: -0.6s;
-      }
-
-      .candles .flame:nth-child(3) {
-        animation-delay: -1.2s;
-      }
-
-      .candles .flame:nth-child(4) {
-        animation-delay: -1.8s;
-      }
-
       .candles .label {
         font-size: 0.8em;
         font-weight: 600;
@@ -146,43 +122,24 @@ export class AdventCalendarDialog extends LitElement {
         white-space: nowrap;
       }
 
-      /* Ohne Video: Kerzen als Zeile unter der Überschrift. */
-      .candles.row,
-      .candles.row .flames {
-        flex-direction: row;
-        justify-content: center;
+      /* Ohne Video: Kerzen mittig unter der Überschrift. */
+      .candles.row {
+        align-self: center;
       }
 
-      @keyframes flicker {
-        0%,
-        100% {
-          transform: rotate(-2deg) scale(1);
-        }
-        50% {
-          transform: rotate(2deg) scale(1.04);
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .candles .flame {
-          animation: none;
-        }
-      }
-
-      /* Schmale Bildschirme: Kerzen als Zeile über dem Video. */
+      /* Schmale Bildschirme: Kerzen über dem Video. */
       @media (max-width: 420px) {
         .video-row {
           flex-direction: column-reverse;
-          align-items: stretch;
+          align-items: center;
         }
 
-        .video-row .candles,
-        .video-row .candles .flames {
-          flex-direction: row;
-          justify-content: center;
+        .video-row .video {
+          align-self: stretch;
         }
       }
     `,
+    candleStyles,
     ...blockStyles,
   ];
 
@@ -240,13 +197,11 @@ export class AdventCalendarDialog extends LitElement {
     });
   }
 
-  /** Kerzen für den Adventssonntag, z. B. 🕯️🕯️ „2. Advent“. */
+  /** Vier Kerzen für den Adventssonntag, davon `advent` angezündet, mit „2. Advent“. */
   private renderCandles(advent: number, row = false) {
     return html`
       <div class="candles ${row ? 'row' : ''}" role="img" aria-label="${advent}. Advent">
-        <span class="flames" aria-hidden="true">
-          ${Array.from({ length: advent }, () => html`<span class="flame">🕯️</span>`)}
-        </span>
+        ${renderAdventCandles(advent)}
         <span class="label">${advent}. Advent</span>
       </div>
     `;

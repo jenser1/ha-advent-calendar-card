@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { burnedWeeks, candleHeight } from '../src/advent-candles';
 import { adventSunday } from '../src/advent-sundays';
 import type { AdventCalendarCardConfig, DoorContent } from '../src/types';
 import { mockHass } from './mock-hass';
@@ -33,6 +34,14 @@ describe('Adventssonntage', () => {
     expect(adventSunday(2026, 0)).toBeUndefined();
     expect(adventSunday(2026, 25)).toBeUndefined();
   });
+
+  it('lässt angezündete Kerzen pro Woche herunterbrennen, unangezündete bleiben neu', () => {
+    expect([0, 1, 2, 3].map((i) => burnedWeeks(2, i))).toEqual([2, 1, 0, 0]);
+    const second = [0, 1, 2, 3].map((i) => candleHeight(2, i));
+    expect(second[0]).toBeLessThan(second[1]);
+    expect(second[1]).toBeLessThan(second[2]);
+    expect(second[2]).toBe(second[3]);
+  });
 });
 
 async function openDoor(day: number, content: DoorContent, extra: Partial<AdventCalendarCardConfig> = {}) {
@@ -46,20 +55,30 @@ async function openDoor(day: number, content: DoorContent, extra: Partial<Advent
 }
 
 describe('Kerzen im Dialog', () => {
-  it('zeigt am 2. Advent zwei Kerzen neben dem Video', async () => {
+  it('zeigt am 2. Advent vier Kerzen neben dem Video, zwei davon brennen', async () => {
     const inner = await openDoor(6, { text: 'Hallo', video: VIDEO });
 
     const row = inner.querySelector('.video-row')!;
     expect(row.querySelector('iframe')).not.toBeNull();
     const candles = row.querySelector('.candles')!;
+    expect(candles.querySelectorAll('.candle')).toHaveLength(4);
+    expect([...candles.querySelectorAll('.candle')].map((c) => c.classList.contains('lit'))).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
     expect(candles.querySelectorAll('.flame')).toHaveLength(2);
     expect(candles.getAttribute('aria-label')).toBe('2. Advent');
     expect(candles.querySelector('.label')!.textContent).toBe('2. Advent');
   });
 
-  it('zeigt am 4. Advent vier Kerzen', async () => {
+  it('am 4. Advent brennen alle vier, die erste ist am weitesten heruntergebrannt', async () => {
     const inner = await openDoor(20, { video: VIDEO });
     expect(inner.querySelectorAll('.candles .flame')).toHaveLength(4);
+    const heights = [...inner.querySelectorAll('.candles .candle')].map((c) => Number(c.getAttribute('data-height')));
+    expect(heights).toEqual([...heights].sort((a, b) => a - b));
+    expect(heights[0]).toBeLessThan(heights[3] / 2);
   });
 
   it('zeigt ohne Video die Kerzen als Zeile unter der Überschrift', async () => {
