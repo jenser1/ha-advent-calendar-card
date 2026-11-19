@@ -45,6 +45,8 @@ export interface AdventCalendarCardConfig {
   snow?: boolean;
   /** Türchen pro Person fest gemischt (Standard: an). */
   shuffle?: boolean;
+  /** Kerzen neben dem Video an den Adventssonntagen (Standard: an). */
+  advent_candles?: boolean;
   /** Text im Dialog, wenn für ein Türchen kein Inhalt eingetragen ist. */
   empty_text?: string;
   /**

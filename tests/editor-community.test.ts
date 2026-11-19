@@ -27,7 +27,7 @@ describe('Editor der Community-Edition', () => {
     const intro = tabElement(editor).shadowRoot!.querySelector('.community')?.textContent;
     expect(intro?.replace(/\s+/g, ' ')).toContain('Eigene Kalender mit eigenen Türchen kommen 2027');
     const fields = forms(editor)[0].schema.map((field) => field.name);
-    expect(fields).toEqual(['title', 'hide_title', 'theme', 'snow', 'shuffle', 'empty_text', 'debug_date']);
+    expect(fields).toEqual(['title', 'hide_title', 'theme', 'snow', 'shuffle', 'advent_candles', 'empty_text', 'debug_date']);
     expect(forms(editor)[1].schema.map((field) => field.name)).toEqual(['light_entity', 'music_entity', 'effect']);
   });
 

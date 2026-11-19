@@ -52,6 +52,7 @@ snow: true
 | `theme`        | `winter`, `kids`, `nerd` | `winter`                     | Look der Karte                                       |
 | `snow`         | `true`/`false`           | `false`                      | Schneefall in der Karte                              |
 | `shuffle`      | `true`/`false`           | `true`                       | Türchen pro Person fest gemischt                     |
+| `advent_candles` | `true`/`false`         | `true`                       | Kerzen neben dem Video an den Adventssonntagen       |
 | `empty_text`   | Text                     | „Heute ist das Türchen leer …“ | Text für Türchen ohne Inhalt                       |
 | `effect_light` | Licht                    | –                            | Lampe beim Öffnen (siehe Licht und Musik)            |
 | `effect_music` | Musik                    | –                            | Musik beim Öffnen (siehe Licht und Musik)            |
@@ -65,6 +66,8 @@ snow: true
 | `winter` | Nachthimmel in Blau mit goldenen Zahlen; hell: Eisblau mit Gold     |
 | `kids`   | Jedes Türchen in einer anderen Farbe, große runde Zahlen            |
 | `nerd`   | Terminal-Look in Grün auf Schwarz, Überschrift mit blinkendem Cursor |
+
+An den Adventssonntagen brennen neben dem Video so viele Kerzen wie am Adventskranz – 2026 am 6. (🕯️🕯️), 13. und 20. Dezember. Die Tage rechnet die Karte selbst aus; mit `advent_candles: false` bleiben die Kerzen aus.
 
 `winter` und `kids` folgen dem hellen bzw. dunklen Design von Home Assistant. Ist am Gerät „Bewegung reduzieren“ eingestellt, gibt es weder Animationen noch Schnee.
 

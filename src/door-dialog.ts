@@ -1,6 +1,7 @@
-import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 import { blockStyles, hasVisibleContent, renderBlocks } from './blocks';
+import { parseVideo } from './blocks/video';
 import type { DoorContent } from './types';
 
 export const DIALOG_TAG = 'advent-calendar-dialog';
@@ -25,6 +26,8 @@ export class AdventCalendarDialog extends LitElement {
   @property({ attribute: false }) emptyText = DEFAULT_EMPTY_TEXT;
   @property({ type: Boolean }) taskDone = false;
   @property({ type: Boolean }) sharedTaskDone = false;
+  /** 1–4 am Adventssonntag: so viele Kerzen erscheinen neben dem Video. */
+  @property({ type: Number }) advent?: number;
 
   /** Abschnitte, deren Rätsel-Lösung schon aufgedeckt ist. */
   @state() private revealed: ReadonlySet<Section> = new Set();
@@ -100,6 +103,85 @@ export class AdventCalendarDialog extends LitElement {
         font-size: 1.1em;
         line-height: 1.5;
       }
+
+      .candles {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        min-width: 56px;
+        text-align: center;
+      }
+
+      .candles .flames {
+        display: flex;
+        flex-direction: column;
+        font-size: 1.5em;
+        line-height: 1.15;
+      }
+
+      .candles .flame {
+        display: inline-block;
+        animation: flicker 2.4s ease-in-out infinite;
+        transform-origin: 50% 90%;
+      }
+
+      .candles .flame:nth-child(2) {
+        animation-delay: -0.6s;
+      }
+
+      .candles .flame:nth-child(3) {
+        animation-delay: -1.2s;
+      }
+
+      .candles .flame:nth-child(4) {
+        animation-delay: -1.8s;
+      }
+
+      .candles .label {
+        font-size: 0.8em;
+        font-weight: 600;
+        color: var(--secondary-text-color, #727272);
+        white-space: nowrap;
+      }
+
+      /* Ohne Video: Kerzen als Zeile unter der Überschrift. */
+      .candles.row,
+      .candles.row .flames {
+        flex-direction: row;
+        justify-content: center;
+      }
+
+      @keyframes flicker {
+        0%,
+        100% {
+          transform: rotate(-2deg) scale(1);
+        }
+        50% {
+          transform: rotate(2deg) scale(1.04);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .candles .flame {
+          animation: none;
+        }
+      }
+
+      /* Schmale Bildschirme: Kerzen als Zeile über dem Video. */
+      @media (max-width: 420px) {
+        .video-row {
+          flex-direction: column-reverse;
+          align-items: stretch;
+        }
+
+        .video-row .candles,
+        .video-row .candles .flames {
+          flex-direction: row;
+          justify-content: center;
+        }
+      }
     `,
     ...blockStyles,
   ];
@@ -147,14 +229,27 @@ export class AdventCalendarDialog extends LitElement {
     );
   }
 
-  private renderSection(section: Section, content: DoorContent) {
+  private renderSection(section: Section, content: DoorContent, videoAside?: TemplateResult) {
     return renderBlocks(content, {
       day: this.day,
       answerRevealed: this.revealed.has(section),
       taskDone: section === 'shared' ? this.sharedTaskDone : this.taskDone,
       onReveal: () => (this.revealed = new Set(this.revealed).add(section)),
       onToggleTask: () => this.onToggleTask(section),
+      videoAside,
     });
+  }
+
+  /** Kerzen für den Adventssonntag, z. B. 🕯️🕯️ „2. Advent“. */
+  private renderCandles(advent: number, row = false) {
+    return html`
+      <div class="candles ${row ? 'row' : ''}" role="img" aria-label="${advent}. Advent">
+        <span class="flames" aria-hidden="true">
+          ${Array.from({ length: advent }, () => html`<span class="flame">🕯️</span>`)}
+        </span>
+        <span class="label">${advent}. Advent</span>
+      </div>
+    `;
   }
 
   render() {
@@ -175,16 +270,28 @@ export class AdventCalendarDialog extends LitElement {
     const personal = hasVisibleContent(this.content) ? this.content! : undefined;
     // Überschriften nur, wenn beide Teile etwas zeigen; gemeinsamer Inhalt kommt zuerst.
     const both = !!shared && !!personal;
+    // Kerzen neben das erste Video; ohne Video als Zeile unter die Überschrift.
+    const advent = this.advent && this.advent >= 1 && this.advent <= 4 ? this.advent : undefined;
+    const hasVideo = (content?: DoorContent) => !!content && !!content.video && !!parseVideo(content.video);
+    const candlesAt: Section | 'top' | undefined = !advent
+      ? undefined
+      : hasVideo(shared)
+        ? 'shared'
+        : hasVideo(personal)
+          ? 'personal'
+          : 'top';
+    const aside = (section: Section) => (candlesAt === section ? this.renderCandles(advent!) : undefined);
     return html`
       <div class="inner">
         <header>
           <h2 id="title">Türchen ${this.day}</h2>
           <button class="close" aria-label="Schließen" @click=${this.requestClose}>✕</button>
         </header>
+        ${candlesAt === 'top' ? this.renderCandles(advent!, true) : nothing}
         ${both ? html`<h3 class="section">🎄 Für alle</h3>` : nothing}
-        ${shared ? this.renderSection('shared', shared) : nothing}
+        ${shared ? this.renderSection('shared', shared, aside('shared')) : nothing}
         ${both ? html`<h3 class="section">Für dich</h3>` : nothing}
-        ${personal ? this.renderSection('personal', personal) : nothing}
+        ${personal ? this.renderSection('personal', personal, aside('personal')) : nothing}
         ${!shared && !personal ? html`<p class="empty">${this.emptyText}</p>` : nothing}
       </div>
     `;

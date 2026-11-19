@@ -34,6 +34,7 @@ Mit `debug_date: "2026-12-24"`:
 - [ ] Alle 24 Türchen nacheinander öffnen: Text, Video und Link stimmen, kein Tippfehler
 - [ ] Jedes Video spielt (YouTube-Player im Dialog, Adresse `youtube-nocookie.com`)
 - [ ] Kanal-Links und GitHub-Karten (Türchen 6 und 23) öffnen die richtige Seite, GitHub zeigt Beschreibung und ⭐
+- [ ] Türchen 6, 13 und 20: 2, 3 bzw. 4 Kerzen neben dem Video (am Handy darüber), sonst keine; mit „Kerzen an den Adventssonntagen“ aus verschwinden sie
 - [ ] Noch leere Türchen zeigen den Text für leere Türchen bzw. `empty_text`
 - [ ] Mit `debug_date: "2026-12-25"`: Karte zeigt, wie viele Türchen geöffnet wurden
 

@@ -131,6 +131,8 @@ export interface BlockContext {
   taskDone: boolean;
   onReveal: () => void;
   onToggleTask: () => void;
+  /** Erscheint neben dem Video, z. B. die Kerzen am Adventssonntag. */
+  videoAside?: TemplateResult;
 }
 
 /** Rendert die Bausteine in der Reihenfolge, in der sie in der YAML stehen. */
@@ -151,7 +153,7 @@ export function renderBlocks(content: DoorContent, context: BlockContext): Templ
       case 'link':
         return renderLink(content.link!);
       default:
-        return renderVideo(content.video!);
+        return renderVideo(content.video!, context.videoAside);
     }
   });
 }

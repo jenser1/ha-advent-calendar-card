@@ -11,6 +11,7 @@ import {
   validateEffect,
 } from './blocks/effect';
 import { runSimpleEffects, validateSimpleEffects } from './blocks/simple-effect';
+import { adventSunday } from './advent-sundays';
 import {
   SHARED_FILE,
   communityDoors,
@@ -172,7 +173,7 @@ export class AdventCalendarCard extends LitElement {
       validateEffect(config.effect, 'effect');
     }
     validateSimpleEffects(config);
-    for (const option of ['snow', 'shuffle'] as const) {
+    for (const option of ['snow', 'shuffle', 'advent_candles'] as const) {
       if (config[option] !== undefined && typeof config[option] !== 'boolean') {
         throw new Error(`„${option}“ muss true oder false sein.`);
       }
@@ -570,6 +571,9 @@ export class AdventCalendarCard extends LitElement {
           .emptyText=${this.config.empty_text ?? DEFAULT_EMPTY_TEXT}
           .taskDone=${!!calendar && openDay !== undefined && isDone(calendar, openDay)}
           .sharedTaskDone=${!!calendar && openDay !== undefined && isDone(calendar, openDay, true)}
+          .advent=${openDay !== undefined && this.config.advent_candles !== false
+            ? adventSunday(year, openDay)
+            : undefined}
           @advent-dialog-close=${() => (this.openDay = undefined)}
           @task-toggle=${this.onTaskToggle}
         ></advent-calendar-dialog>

@@ -35,6 +35,7 @@ interface GeneralData {
   theme: string;
   snow: boolean;
   shuffle: boolean;
+  advent_candles: boolean;
   empty_text: string;
   content_source: ContentSource;
   json_path: string;
@@ -48,6 +49,7 @@ const LABELS: Record<string, string> = {
   theme: 'Theme',
   snow: 'Schneefall',
   shuffle: 'Türchen mischen',
+  advent_candles: 'Kerzen an den Adventssonntagen',
   empty_text: 'Text für leere Türchen',
   content_source: 'Inhaltsquelle',
   json_path: 'Pfad der Dateien',
@@ -59,6 +61,7 @@ const HELPERS: Record<string, string> = {
   year: 'Leer lassen für das aktuelle Jahr.',
   theme: 'Gilt für alle, die im Tab „Personen“ kein eigenes Theme haben.',
   shuffle: 'Jede Person bekommt eine eigene, feste Reihenfolge.',
+  advent_candles: 'Am 2., 3. und 4. Advent brennen neben dem Video so viele Kerzen wie am Adventskranz.',
   empty_text: `Leer lassen für „${DEFAULT_EMPTY_TEXT}“`,
   content_source:
     'JSON-Dateien halten die Inhalte aus der Dashboard-Konfiguration heraus. Personen, Themes und Einstellungen bleiben hier.',
@@ -107,6 +110,7 @@ export class AdventCalendarEditorGeneral extends LitElement {
       theme: config.theme ?? DEFAULT_THEME,
       snow: config.snow ?? false,
       shuffle: config.shuffle ?? true,
+      advent_candles: config.advent_candles ?? true,
       empty_text: config.empty_text ?? '',
       content_source: config.content_source ?? 'yaml',
       json_path: this.pathDraft?.value ?? config.json_path ?? DEFAULT_JSON_PATH,
@@ -127,6 +131,7 @@ export class AdventCalendarEditorGeneral extends LitElement {
       { name: 'theme', selector: { select: { mode: 'dropdown', options: THEME_OPTIONS } } },
       { name: 'snow', selector: { boolean: {} } },
       { name: 'shuffle', selector: { boolean: {} } },
+      { name: 'advent_candles', selector: { boolean: {} } },
       { name: 'empty_text', selector: { text: { multiline: true } } },
       ...(ownContent
         ? [{ name: 'content_source', selector: { select: { mode: 'dropdown', options: SOURCE_OPTIONS } } }]
@@ -152,6 +157,7 @@ export class AdventCalendarEditorGeneral extends LitElement {
     );
     setOrDelete(next, 'snow', value.snow ? true : undefined);
     setOrDelete(next, 'shuffle', value.shuffle === false ? false : undefined);
+    setOrDelete(next, 'advent_candles', value.advent_candles === false ? false : undefined);
     setOrDelete(next, 'empty_text', value.empty_text?.trim() ? value.empty_text : undefined);
     this.applySource(next, value.content_source);
     this.applyPath(next, value.json_path);

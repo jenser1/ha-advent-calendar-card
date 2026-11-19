@@ -1,4 +1,4 @@
-import { css, html } from 'lit';
+import { css, html, type TemplateResult } from 'lit';
 import { isSafeUrl } from './url';
 
 export type VideoSource =
@@ -13,6 +13,17 @@ export const videoStyles = css`
     border: 0;
     border-radius: 10px;
     background: #000;
+  }
+
+  .video-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .video-row .video {
+    flex: 1;
+    min-width: 0;
   }
 `;
 
@@ -69,10 +80,19 @@ export function youtubeEmbedUrl(id: string, start?: number): string {
   return `https://www.youtube-nocookie.com/embed/${id}${start ? `?start=${start}` : ''}`;
 }
 
-export function renderVideo(value: string) {
+/** Video, auf Wunsch mit etwas daneben (`aside`, z. B. Adventskerzen). */
+export function renderVideo(value: string, aside?: TemplateResult) {
+  const player = renderPlayer(value);
+  if (!player || !aside) {
+    return player ?? html``;
+  }
+  return html`<div class="video-row">${player}${aside}</div>`;
+}
+
+function renderPlayer(value: string): TemplateResult | undefined {
   const source = parseVideo(value);
   if (!source) {
-    return html``;
+    return undefined;
   }
   if (source.kind === 'file') {
     return html`<video class="video" src=${source.src} controls preload="metadata"></video>`;

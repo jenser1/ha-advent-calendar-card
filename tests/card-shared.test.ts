@@ -41,10 +41,10 @@ function inner(card: HTMLElement) {
   return dialogOf(card).shadowRoot!.querySelector('.inner')!;
 }
 
-/** Klassen bzw. Überschriften der Dialog-Inhalte (ohne Kopfzeile) in Reihenfolge */
+/** Klassen bzw. Überschriften der Dialog-Inhalte (ohne Kopfzeile und Adventskerzen) in Reihenfolge */
 function sections(card: HTMLElement) {
   return [...inner(card).children]
-    .filter((el) => el.tagName !== 'HEADER')
+    .filter((el) => el.tagName !== 'HEADER' && !el.classList.contains('candles'))
     .map((el) => (el.tagName === 'H3' ? `# ${el.textContent}` : el.textContent?.trim()));
 }
 
