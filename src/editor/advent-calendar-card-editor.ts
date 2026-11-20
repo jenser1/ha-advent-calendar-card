@@ -2,7 +2,7 @@ import { LitElement, css, html } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { COMMUNITY_CALENDAR } from '../edition';
 import type { AdventCalendarCardConfig, HomeAssistant } from '../types';
-import { fireConfigChanged, loadHaFormComponents } from './shared';
+import { fireConfigChanged, loadHaFormComponents, sameValue } from './shared';
 import './tab-doors';
 import './tab-general';
 import './tab-persons';
@@ -32,6 +32,12 @@ export class AdventCalendarCardEditor extends LitElement {
   @state() private tab: Tab = 'general';
 
   setConfig(config: AdventCalendarCardConfig): void {
+    // HA reicht nach jeder Änderung eine (eingefrorene) Kopie zurück. Ist sie inhaltlich
+    // gleich, behalten wir unsere Objekte – sonst baut der Aktions-Editor seine Zeilen
+    // neu auf und klappt sie bei jedem Buchstaben zu.
+    if (this.config && sameValue(config, this.config)) {
+      return;
+    }
     this.config = config;
   }
 

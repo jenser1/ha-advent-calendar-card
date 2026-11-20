@@ -28,6 +28,32 @@ export const SHARED_MODE_OPTIONS = (Object.keys(SHARED_MODE_LABELS) as SharedMod
   label: SHARED_MODE_LABELS[mode],
 }));
 
+/** Inhaltlich gleich (Reihenfolge der Schlüssel egal)? Für Configs aus YAML/JSON-Werten. */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (a instanceof Date || b instanceof Date) {
+    return a instanceof Date && b instanceof Date && a.getTime() === b.getTime();
+  }
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+    return false;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  return keysA.every(
+    (key) =>
+      Object.prototype.hasOwnProperty.call(b, key) &&
+      sameValue((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+  );
+}
+
 /** Meldet eine geänderte Config an den Editor bzw. an HA. */
 export function fireConfigChanged(element: HTMLElement, config: AdventCalendarCardConfig): void {
   element.dispatchEvent(
