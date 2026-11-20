@@ -52,6 +52,41 @@ describe('Editor: setConfig', () => {
   });
 });
 
+describe('Editor: Aufrufe für HAs Aktions-Editor', () => {
+  it('ergänzt bei eingefrorenen Aufrufen data und action – als gleichbleibende Kopie', async () => {
+    const { editor } = await renderEditor({});
+    const call = Object.freeze({ service: 'light.turn_on', target: Object.freeze({ entity_id: 'light.baum' }) });
+    editor.setConfig({ type: TYPE, effect: [call] } as never);
+    await editor.updateComplete;
+    await Promise.resolve();
+    const shown = forms(editor)[1].data.effect as Record<string, unknown>[];
+    expect(shown[0]).toEqual({ action: 'light.turn_on', target: { entity_id: 'light.baum' }, data: {} });
+    expect(Object.isFrozen(shown[0])).toBe(false);
+
+    // Neu gerendert: dieselbe Kopie, damit die Zeile offen bleibt.
+    editor.requestUpdate();
+    await editor.updateComplete;
+    await Promise.resolve();
+    expect((forms(editor)[1].data.effect as unknown[])[0]).toBe(shown[0]);
+  });
+
+  it('ergänzt neue Aufrufe aus dem Formular direkt (gleiches Objekt)', async () => {
+    const { editor, changes } = await renderEditor({});
+    const fresh = { action: 'light.set_effect', target: { entity_id: 'light.baum' } };
+    await change(editor, forms(editor)[1], { effect: [fresh] });
+    const sent = last(changes).effect as unknown[];
+    expect(sent[0]).toBe(fresh);
+    expect(fresh).toEqual({ action: 'light.set_effect', target: { entity_id: 'light.baum' }, data: {} });
+  });
+
+  it('lässt andere Aktionen (z. B. delay) unverändert', async () => {
+    const { editor, changes } = await renderEditor({});
+    const delay = { delay: { seconds: 2 } };
+    await change(editor, forms(editor)[1], { effect: [delay] });
+    expect(last(changes).effect).toEqual([{ delay: { seconds: 2 } }]);
+  });
+});
+
 describe('sameValue', () => {
   it('vergleicht Inhalte, nicht Objekte', () => {
     const a: AdventCalendarCardConfig = { type: TYPE, effect: [ACTION], snow: true };

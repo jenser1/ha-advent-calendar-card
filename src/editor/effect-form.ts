@@ -99,6 +99,54 @@ function mediaPick(music: MusicEffectConfig | undefined): MediaPick | undefined 
   };
 }
 
+/**
+ * HA friert die Config im Karten-Editor ein. Sein Aktions-Editor will Aufrufen ohne `data`
+ * aber `data: {}` anhängen bzw. `service` in `action` umschreiben – auf eingefrorenen
+ * Objekten wirft das („object is not extensible“). Darum bekommt er solche Aufrufe ergänzt:
+ * noch offene Objekte direkt (die Identität bleibt, sonst klappt die Zeile zu), eingefrorene
+ * als gemerkte Kopie (pro Objekt immer dieselbe).
+ */
+const editableCopies = new WeakMap<object, EffectCall>();
+
+function needsFix(call: EffectCall): boolean {
+  if (!call || typeof call !== 'object') {
+    return false;
+  }
+  const isCall = typeof call.action === 'string' || typeof call.service === 'string';
+  return isCall && (!('data' in call) || 'service' in call);
+}
+
+function fixCall(call: EffectCall): void {
+  if (typeof call.service === 'string' && !call.action) {
+    call.action = call.service;
+  }
+  delete call.service;
+  if (!('data' in call)) {
+    call.data = {};
+  }
+}
+
+export function editableCall(call: EffectCall): EffectCall {
+  if (!needsFix(call)) {
+    return call;
+  }
+  if (!Object.isFrozen(call)) {
+    fixCall(call);
+    return call;
+  }
+  let copy = editableCopies.get(call);
+  if (!copy) {
+    copy = { ...call };
+    fixCall(copy);
+    editableCopies.set(call, copy);
+  }
+  return copy;
+}
+
+function editableCalls(calls: EffectCall[]): EffectCall[] {
+  return calls.some(needsFix) ? calls.map(editableCall) : calls;
+}
+
 export function effectFormData(
   config: AdventCalendarCardConfig,
   hass: HomeAssistant | undefined,
@@ -115,7 +163,7 @@ export function effectFormData(
     music_media: music?.media_id,
     music_volume: music?.volume,
     music_days: (music?.days ?? []).map(String),
-    effect: Array.isArray(config.effect) ? config.effect : config.effect ? [config.effect] : [],
+    effect: editableCalls(Array.isArray(config.effect) ? config.effect : config.effect ? [config.effect] : []),
   };
 }
 
@@ -233,6 +281,6 @@ export function applyEffectForm(
   setOrDelete(
     next,
     'effect',
-    Array.isArray(value.effect) && value.effect.length > 0 ? value.effect : undefined,
+    Array.isArray(value.effect) && value.effect.length > 0 ? editableCalls(value.effect) : undefined,
   );
 }
