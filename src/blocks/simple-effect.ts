@@ -123,20 +123,126 @@ export function musicCalls(music: MusicEffectConfig | undefined, day: number): E
   return calls;
 }
 
+/** Nach so vielen Millisekunden geht eine vorher ausgeschaltete Lampe nach dem Blinken wieder aus. */
+export const FLASH_RESTORE_MS = 3000;
+/** So lange zählt ein Stopp der Musik noch als Anlaufen (Wechsel des Titels, Puffern). */
+export const MUSIC_START_GRACE_MS = 10_000;
+/** Spielt die Musik bis dahin nicht, wird die Lautstärke trotzdem zurückgestellt. */
+export const MUSIC_START_TIMEOUT_MS = 60_000;
+
+/** Lampe war vor dem Blinken aus? Dann blinkt sie nur und bleibt nicht an. */
+function wasOff(hass: HomeAssistant, entityId: string): boolean {
+  return hass.states?.[entityId]?.state === 'off';
+}
+
+async function runLight(
+  hass: HomeAssistant,
+  light: LightEffectConfig | undefined,
+  variables: EffectVariables,
+): Promise<string[]> {
+  const call = lightCall(light);
+  if (!call || !light?.entity_id) {
+    return [];
+  }
+  const entityId = light.entity_id;
+  const restore = call.data?.flash !== undefined && wasOff(hass, entityId);
+  const errors = await runEffects(hass, call, variables);
+  if (restore && errors.length === 0) {
+    setTimeout(() => {
+      hass.callService('light', 'turn_off', {}, { entity_id: entityId }, false).catch((err) =>
+        console.warn('[advent-calendar-card] Lampe nicht wieder ausgeschaltet:', err),
+      );
+    }, FLASH_RESTORE_MS);
+  }
+  return errors;
+}
+
+interface PendingVolume {
+  /** Lautstärke vor dem Türchen (0–1). */
+  previous: number;
+  /** Von der Karte gesetzte Lautstärke (0–1). */
+  set: number;
+  since: number;
+  playing: boolean;
+}
+
+/** Player, deren Lautstärke nach der Musik zurückgestellt wird. */
+const pendingVolumes = new Map<string, PendingVolume>();
+
+/** Nur für Tests. */
+export function clearPendingVolumes(): void {
+  pendingVolumes.clear();
+}
+
+function volumeOf(hass: HomeAssistant, entityId: string): number | undefined {
+  const level = hass.states?.[entityId]?.attributes?.volume_level;
+  return typeof level === 'number' ? level : undefined;
+}
+
+/**
+ * Stellt die Lautstärke zurück, sobald die Musik des Türchens zu Ende ist. Wird bei jedem
+ * hass-Update der Karte aufgerufen – also nur, solange ein Dashboard mit der Karte offen ist.
+ * Hat jemand die Lautstärke inzwischen selbst geändert, bleibt sie so.
+ */
+export function restoreVolumes(hass: HomeAssistant | undefined, now = Date.now()): void {
+  if (!hass?.states || pendingVolumes.size === 0) {
+    return;
+  }
+  for (const [entityId, pending] of pendingVolumes) {
+    const state = hass.states[entityId]?.state;
+    if (state === 'playing' || state === 'buffering') {
+      pending.playing = pending.playing || state === 'playing';
+      continue;
+    }
+    const age = now - pending.since;
+    const finished = pending.playing ? age >= MUSIC_START_GRACE_MS : age >= MUSIC_START_TIMEOUT_MS;
+    if (!finished) {
+      continue;
+    }
+    pendingVolumes.delete(entityId);
+    const current = volumeOf(hass, entityId);
+    if (current !== undefined && Math.abs(current - pending.set) > 0.011) {
+      continue;
+    }
+    hass
+      .callService('media_player', 'volume_set', { volume_level: pending.previous }, { entity_id: entityId }, false)
+      .catch((err) => console.warn('[advent-calendar-card] Lautstärke nicht zurückgestellt:', err));
+  }
+}
+
+async function runMusic(
+  hass: HomeAssistant,
+  music: MusicEffectConfig | undefined,
+  variables: EffectVariables,
+): Promise<string[]> {
+  const calls = musicCalls(music, variables.tag);
+  const entityId = music?.entity_id;
+  const volumeCall = calls.find((call) => call.action === 'media_player.volume_set');
+  const previous = entityId ? volumeOf(hass, entityId) : undefined;
+  const errors: string[] = [];
+  for (const call of calls) {
+    errors.push(...(await runEffects(hass, call, variables)));
+  }
+  const set = volumeCall?.data?.volume_level;
+  if (entityId && previous !== undefined && typeof set === 'number' && errors.length === 0) {
+    // Läuft schon eine Rückstellung, bleibt die ursprüngliche Lautstärke maßgeblich.
+    const earlier = pendingVolumes.get(entityId)?.previous;
+    if (Math.abs((earlier ?? previous) - set) > 0.001) {
+      pendingVolumes.set(entityId, { previous: earlier ?? previous, set, since: Date.now(), playing: false });
+    }
+  }
+  return errors;
+}
+
 /** Löst Licht und Musik gleichzeitig aus; die Musik-Schritte laufen nacheinander. Liefert Fehler. */
 export async function runSimpleEffects(
   hass: HomeAssistant,
   config: AdventCalendarCardConfig,
   variables: EffectVariables,
 ): Promise<string[]> {
-  const light = lightCall(config.effect_light);
-  const music = async (): Promise<string[]> => {
-    const errors: string[] = [];
-    for (const call of musicCalls(config.effect_music, variables.tag)) {
-      errors.push(...(await runEffects(hass, call, variables)));
-    }
-    return errors;
-  };
-  const results = await Promise.all([light ? runEffects(hass, light, variables) : [], music()]);
+  const results = await Promise.all([
+    runLight(hass, config.effect_light, variables),
+    runMusic(hass, config.effect_music, variables),
+  ]);
   return results.flat();
 }

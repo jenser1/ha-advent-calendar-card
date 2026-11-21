@@ -10,7 +10,7 @@ import {
   sharedEffectNotice,
   validateEffect,
 } from './blocks/effect';
-import { runSimpleEffects, validateSimpleEffects } from './blocks/simple-effect';
+import { restoreVolumes, runSimpleEffects, validateSimpleEffects } from './blocks/simple-effect';
 import { adventSunday } from './advent-sundays';
 import {
   SHARED_FILE,
@@ -124,6 +124,8 @@ export class AdventCalendarCard extends LitElement {
   set hass(hass: HomeAssistant | undefined) {
     const previous = this._hass;
     this._hass = hass;
+    // Lautstärke zurückstellen, sobald die Musik eines Türchens zu Ende ist.
+    restoreVolumes(hass);
     if (
       previous?.user?.id !== hass?.user?.id ||
       previous?.user?.name !== hass?.user?.name ||
