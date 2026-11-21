@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jenser1/ha-advent-calendar-card/main/docs/logo.png" alt="Logo ha-adventskalender: ein Haus mit Adventskalender, Schleife, Tannenbaum und Geschenk" width="320">
+</p>
+
 # 🎄 Adventskalender-Card für Home Assistant
 
 Ein Adventskalender für dein Home-Assistant-Dashboard – gemacht für die deutschsprachige Community. Vom 1. bis 24. Dezember öffnet sich jeden Tag ein Türchen mit einem Tipp, einem Video oder einem Projekt rund um Home Assistant. Die Videos stammen von deutschsprachigen Home-Assistant-YouTubern, die dem Kalender ausdrücklich zugestimmt haben.
