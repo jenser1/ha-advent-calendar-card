@@ -181,8 +181,10 @@ Die Türchen stehen in der fertigen JS-Datei leicht verschleiert (XOR + Base64) 
 
 Das Secret einmalig anlegen: im Repository unter **Settings → Secrets and variables → Actions → New repository secret**, Name `ADVENT_CONTENT_2026`, Wert = der komplette Inhalt von `content/2026.json`. Nach jeder Änderung an den Inhalten das Secret aktualisieren.
 
+Neue Version anlegen (erhöht die letzte Stelle, z. B. 0.18.3 → 0.18.4, und setzt den passenden Tag):
+
 ```bash
-npm version 0.16.0
+npm version patch
 ```
 
 ```bash
