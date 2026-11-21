@@ -130,9 +130,86 @@ export const MUSIC_START_GRACE_MS = 10_000;
 /** Spielt die Musik bis dahin nicht, wird die Lautstärke trotzdem zurückgestellt. */
 export const MUSIC_START_TIMEOUT_MS = 60_000;
 
+/** So lange bleibt eine Lampe ohne eigene Blink-Funktion beim nachgebauten Blinken an bzw. aus. */
+export const BLINK_MS = 1000;
+/** LightEntityFeature.FLASH in HA. */
+const FEATURE_FLASH = 8;
+
 /** Lampe war vor dem Blinken aus? Dann blinkt sie nur und bleibt nicht an. */
 function wasOff(hass: HomeAssistant, entityId: string): boolean {
   return hass.states?.[entityId]?.state === 'off';
+}
+
+/** Kann die Lampe nicht selbst blinken? (Nur, wenn HA das sicher meldet.) */
+function lacksFlash(hass: HomeAssistant, entityId: string): boolean {
+  const state = hass.states?.[entityId];
+  const features = state?.attributes?.supported_features;
+  return (
+    (state?.state === 'on' || state?.state === 'off') &&
+    typeof features === 'number' &&
+    (features & FEATURE_FLASH) === 0
+  );
+}
+
+const COLOR_ATTRIBUTES: Record<string, string> = {
+  color_temp: 'color_temp_kelvin',
+  hs: 'hs_color',
+  rgb: 'rgb_color',
+  rgbw: 'rgbw_color',
+  rgbww: 'rgbww_color',
+  xy: 'xy_color',
+};
+
+/** Daten für light.turn_on, die Helligkeit, Farbe bzw. laufenden Effekt wiederherstellen. */
+export function restoreLightData(attributes: Record<string, unknown> | undefined): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+  if (!attributes) {
+    return data;
+  }
+  if (typeof attributes.brightness === 'number') {
+    data.brightness = attributes.brightness;
+  }
+  const effect = attributes.effect;
+  const effects = attributes.effect_list;
+  if (typeof effect === 'string' && effect !== 'none' && Array.isArray(effects) && effects.includes(effect)) {
+    data.effect = effect;
+    return data;
+  }
+  const colorKey = COLOR_ATTRIBUTES[String(attributes.color_mode)];
+  if (colorKey && attributes[colorKey] != null) {
+    data[colorKey] = attributes[colorKey];
+  }
+  return data;
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Blinken für Lampen ohne eigene Blink-Funktion (z. B. viele Govee): einmal kurz
+ * umschalten und zurück. War sie an, kommen Helligkeit, Farbe bzw. Effekt wieder.
+ */
+async function blinkByHand(
+  hass: HomeAssistant,
+  entityId: string,
+  variables: EffectVariables,
+): Promise<string[]> {
+  const target = { entity_id: entityId };
+  const state = hass.states?.[entityId];
+  if (state?.state === 'off') {
+    const errors = await runEffects(hass, { action: 'light.turn_on', target, data: {} }, variables);
+    if (errors.length === 0) {
+      await sleep(BLINK_MS);
+      errors.push(...(await runEffects(hass, { action: 'light.turn_off', target, data: {} }, variables)));
+    }
+    return errors;
+  }
+  const restore = restoreLightData(state?.attributes);
+  const errors = await runEffects(hass, { action: 'light.turn_off', target, data: {} }, variables);
+  if (errors.length === 0) {
+    await sleep(BLINK_MS);
+    errors.push(...(await runEffects(hass, { action: 'light.turn_on', target, data: restore }, variables)));
+  }
+  return errors;
 }
 
 async function runLight(
@@ -145,7 +222,11 @@ async function runLight(
     return [];
   }
   const entityId = light.entity_id;
-  const restore = call.data?.flash !== undefined && wasOff(hass, entityId);
+  const flash = call.data?.flash !== undefined;
+  if (flash && lacksFlash(hass, entityId)) {
+    return blinkByHand(hass, entityId, variables);
+  }
+  const restore = flash && wasOff(hass, entityId);
   const errors = await runEffects(hass, call, variables);
   if (restore && errors.length === 0) {
     setTimeout(() => {

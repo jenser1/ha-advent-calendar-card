@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  BLINK_MS,
   FLASH_RESTORE_MS,
+  restoreLightData,
   MUSIC_START_GRACE_MS,
   MUSIC_START_TIMEOUT_MS,
   clearPendingVolumes,
@@ -68,6 +70,72 @@ describe('Licht: Zustand nach dem Blinken', () => {
     );
     await vi.advanceTimersByTimeAsync(FLASH_RESTORE_MS * 2);
     expect(names(hass)).toEqual(['light.turn_on']);
+  });
+});
+
+describe('Licht ohne eigene Blink-Funktion (z. B. Govee)', () => {
+  const GOVEE = {
+    supported_features: 4,
+    brightness: 206,
+    color_mode: 'color_temp',
+    color_temp_kelvin: 4333,
+    rgb_color: [255, 214, 181],
+    effect_list: ['none', 'snow_flake'],
+  };
+
+  function govee(state: string, attributes: Record<string, unknown>): MockHass {
+    const hass = home(state);
+    hass.states = { ...hass.states, 'light.baum': { state, attributes } };
+    return hass;
+  }
+
+  it('war aus: kurz an, dann wieder aus', async () => {
+    vi.useFakeTimers();
+    const hass = govee('off', { supported_features: 4 });
+    const done = runSimpleEffects(hass, FLASH, VARS);
+    await vi.advanceTimersByTimeAsync(BLINK_MS);
+    expect(await done).toEqual([]);
+    expect(names(hass)).toEqual(['light.turn_on', 'light.turn_off']);
+    expect(hass.serviceCalls[0].data).toEqual({});
+    // Kein zusätzliches Ausschalten hinterher.
+    await vi.advanceTimersByTimeAsync(FLASH_RESTORE_MS * 2);
+    expect(names(hass)).toHaveLength(2);
+  });
+
+  it('war an: kurz aus, dann mit Helligkeit und Farbe wieder an', async () => {
+    vi.useFakeTimers();
+    const hass = govee('on', GOVEE);
+    const done = runSimpleEffects(hass, FLASH, VARS);
+    await vi.advanceTimersByTimeAsync(BLINK_MS);
+    await done;
+    expect(names(hass)).toEqual(['light.turn_off', 'light.turn_on']);
+    expect(hass.serviceCalls[1].data).toEqual({ brightness: 206, color_temp_kelvin: 4333 });
+  });
+
+  it('war an mit Effekt: der Effekt kommt zurück', async () => {
+    vi.useFakeTimers();
+    const hass = govee('on', { ...GOVEE, effect: 'snow_flake' });
+    const done = runSimpleEffects(hass, FLASH, VARS);
+    await vi.advanceTimersByTimeAsync(BLINK_MS);
+    await done;
+    expect(hass.serviceCalls[1].data).toEqual({ brightness: 206, effect: 'snow_flake' });
+  });
+
+  it('Lampen mit Blink-Funktion blinken selbst', async () => {
+    vi.useFakeTimers();
+    const hass = govee('on', { ...GOVEE, supported_features: 4 | 8 });
+    await runSimpleEffects(hass, FLASH, VARS);
+    await vi.advanceTimersByTimeAsync(FLASH_RESTORE_MS * 2);
+    expect(names(hass)).toEqual(['light.turn_on']);
+    expect(hass.serviceCalls[0].data).toEqual({ flash: 'short' });
+  });
+
+  it('restoreLightData ohne Angaben ist leer', () => {
+    expect(restoreLightData(undefined)).toEqual({});
+    expect(restoreLightData({ color_mode: 'onoff' })).toEqual({});
+    expect(restoreLightData({ color_mode: 'hs', hs_color: [10, 20], effect: 'none', effect_list: ['none'] })).toEqual({
+      hs_color: [10, 20],
+    });
   });
 });
 
