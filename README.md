@@ -22,15 +22,23 @@ Ein Adventskalender für dein Home-Assistant-Dashboard – gemacht für die deut
 
 Voraussetzung: Home Assistant 2024.11 oder neuer.
 
-### Über HACS (empfohlen)
+### Über den Marketplace (ab Home Assistant 2026.11, empfohlen)
 
-Die Karte steht (noch) nicht im HACS-Standardverzeichnis, sondern wird als benutzerdefiniertes Repository hinzugefügt:
+Seit 2026.11 ist HACS als **Marketplace** fest eingebaut. Die Karte steht (noch) nicht im Verzeichnis, sondern wird über ihren GitHub-Link hinzugefügt:
+
+1. **Einstellungen → Marketplace → Über Link hinzufügen** (Symbol rechts neben der Suche)
+   - GitHub-Link: `https://github.com/jenser1/ha-advent-calendar-card`
+   - **Hinzufügen** klicken
+2. **Adventskalender Card** herunterladen. Die Ressource trägt der Marketplace selbst ein.
+3. Browser neu laden (in der Companion-App: Einstellungen → Companion-App → Fehlerbehebung → Frontend-Cache zurücksetzen).
+
+### Über HACS (vor Home Assistant 2026.11)
 
 1. **HACS → ⋮ (oben rechts) → Benutzerdefinierte Repositories**
    - Repository: `https://github.com/jenser1/ha-advent-calendar-card`
    - Typ: **Dashboard**
 2. In HACS nach **Adventskalender Card** suchen und herunterladen. Die Ressource trägt HACS selbst ein.
-3. Browser neu laden (in der Companion-App: Einstellungen → Companion-App → Fehlerbehebung → Frontend-Cache zurücksetzen).
+3. Browser neu laden.
 
 ### Manuell
 

@@ -19,9 +19,11 @@ Eine animierte Custom Lovelace Card, die jeder Person im Haushalt einen eigenen 
 
 Voraussetzung: Home Assistant 2024.11 oder neuer.
 
-### HACS
+### Marketplace bzw. HACS
 
-Die Karte steht nicht im HACS-Standardverzeichnis, sondern wird als benutzerdefiniertes Repository hinzugefügt:
+Ab Home Assistant 2026.11: **Einstellungen → Marketplace → Über Link hinzufügen**, GitHub-Link `https://github.com/jenser1/ha-advent-calendar-card` eintragen, **Hinzufügen** und die Karte herunterladen.
+
+Vor 2026.11 über HACS als benutzerdefiniertes Repository:
 
 1. **HACS → ⋮ → Benutzerdefinierte Repositories**
    - Repository: `https://github.com/jenser1/ha-advent-calendar-card`
