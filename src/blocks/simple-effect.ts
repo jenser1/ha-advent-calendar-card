@@ -167,8 +167,15 @@ const COLOR_ATTRIBUTES: Record<string, string> = {
   xy: 'xy_color',
 };
 
-/** Daten für light.turn_on, die Helligkeit, Farbe bzw. laufenden Effekt wiederherstellen. */
-export function restoreLightData(attributes: Record<string, unknown> | undefined): Record<string, unknown> {
+/**
+ * Daten für light.turn_on, die Helligkeit, Farbe bzw. laufenden Effekt wiederherstellen.
+ * `ignoreEffect`: Effekt, den die Karte selbst gestartet hat. Manche Lampen (z. B. Govee)
+ * melden einen Effekt weiter, obwohl er längst aus ist – dann zählt die Farbe.
+ */
+export function restoreLightData(
+  attributes: Record<string, unknown> | undefined,
+  ignoreEffect?: string,
+): Record<string, unknown> {
   const data: Record<string, unknown> = {};
   if (!attributes) {
     return data;
@@ -178,7 +185,13 @@ export function restoreLightData(attributes: Record<string, unknown> | undefined
   }
   const effect = attributes.effect;
   const effects = attributes.effect_list;
-  if (typeof effect === 'string' && effect !== 'none' && Array.isArray(effects) && effects.includes(effect)) {
+  if (
+    typeof effect === 'string' &&
+    effect !== 'none' &&
+    effect.toLowerCase() !== ignoreEffect?.trim().toLowerCase() &&
+    Array.isArray(effects) &&
+    effects.includes(effect)
+  ) {
     data.effect = effect;
     return data;
   }
@@ -242,7 +255,11 @@ async function runLight(
       const back: EffectCall =
         before.state === 'off'
           ? { action: 'light.turn_off', target: { entity_id: entityId }, data: {} }
-          : { action: 'light.turn_on', target: { entity_id: entityId }, data: restoreLightData(before.attributes) };
+          : {
+              action: 'light.turn_on',
+              target: { entity_id: entityId },
+              data: restoreLightData(before.attributes, light.effect),
+            };
       setTimeout(() => {
         void runEffects(hass, back, variables).then((failed) => {
           if (failed.length > 0) {

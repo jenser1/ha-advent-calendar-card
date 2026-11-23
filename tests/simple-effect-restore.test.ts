@@ -169,6 +169,27 @@ describe('Lichteffekt mit Dauer', () => {
     expect(hass.serviceCalls[1].data).toEqual({ brightness: 120, rgb_color: [255, 0, 0] });
   });
 
+  it('war an, meldet aber noch denselben Effekt (Govee): zurück zur Farbe', async () => {
+    vi.useFakeTimers();
+    const hass = home('on');
+    hass.states = {
+      ...hass.states,
+      'light.baum': {
+        state: 'on',
+        attributes: {
+          brightness: 216,
+          color_mode: 'color_temp',
+          color_temp_kelvin: 4333,
+          effect: 'rainbow',
+          effect_list: ['none', 'rainbow'],
+        },
+      },
+    };
+    await runSimpleEffects(hass, effect(10), VARS);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(hass.serviceCalls[1].data).toEqual({ brightness: 216, color_temp_kelvin: 4333 });
+  });
+
   it('ohne Dauer läuft der Effekt weiter', async () => {
     vi.useFakeTimers();
     const hass = home('off');
