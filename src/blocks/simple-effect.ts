@@ -141,6 +141,11 @@ export const FLASH_RESTORE_MS = 3000;
 export const MUSIC_START_GRACE_MS = 10_000;
 /** Spielt die Musik bis dahin nicht, wird die Lautstärke trotzdem zurückgestellt. */
 export const MUSIC_START_TIMEOUT_MS = 60_000;
+/**
+ * Viele Geräte stellen die Lautstärke nur in Stufen ein (z. B. 35 % → 37 %). Erst eine
+ * größere Abweichung gilt als „selbst geändert“ – dann bleibt die Lautstärke, wie sie ist.
+ */
+export const VOLUME_TOLERANCE = 0.05;
 
 /** So lange bleibt eine Lampe ohne eigene Blink-Funktion beim nachgebauten Blinken an bzw. aus. */
 export const BLINK_MS = 1000;
@@ -325,7 +330,7 @@ export function restoreVolumes(hass: HomeAssistant | undefined, now = Date.now()
     }
     pendingVolumes.delete(entityId);
     const current = volumeOf(hass, entityId);
-    if (current !== undefined && Math.abs(current - pending.set) > 0.011) {
+    if (current !== undefined && Math.abs(current - pending.set) > VOLUME_TOLERANCE) {
       continue;
     }
     hass

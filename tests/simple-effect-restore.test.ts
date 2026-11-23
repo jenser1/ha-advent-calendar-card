@@ -246,6 +246,21 @@ describe('Musik: Lautstärke danach zurück', () => {
     expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.2 });
   });
 
+  it('stellt auch zurück, wenn das Gerät die Lautstärke in Stufen setzt (35 % → 37 %)', async () => {
+    const hass = home('on', 'playing', 0.13);
+    const config: AdventCalendarCardConfig = {
+      type: 'x',
+      effect_music: { entity_id: 'media_player.kueche', player: 'media_player', media_id: '/local/a.mp3', volume: 35 },
+    };
+    await runSimpleEffects(hass, config, VARS);
+    const start = Date.now();
+    setPlayer(hass, 'playing', 0.37);
+    restoreVolumes(hass, start + 1000);
+    setPlayer(hass, 'paused', 0.37);
+    restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 3000);
+    expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.13 });
+  });
+
   it('lässt eine selbst geänderte Lautstärke in Ruhe', async () => {
     const hass = home('on');
     await runSimpleEffects(hass, MUSIC, VARS);
