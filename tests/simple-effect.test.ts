@@ -178,6 +178,7 @@ describe('Editor: Effekt-Bereich im Tab „Allgemein“', () => {
       'music_media',
       'music_volume',
       'music_days',
+      'music_controls',
       'effect',
     ]);
 

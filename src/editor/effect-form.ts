@@ -30,6 +30,7 @@ export interface EffectFormData {
   music_media?: string;
   music_volume?: number;
   music_days?: string[];
+  music_controls?: boolean;
   effect: EffectCall[];
 }
 
@@ -44,6 +45,7 @@ export const EFFECT_LABELS: Record<string, string> = {
   music_media: 'Titel oder Adresse',
   music_volume: 'Lautstärke',
   music_days: 'Musik an welchen Türchen',
+  music_controls: 'Musik-Tasten im Türchen',
   effect: 'Erweitert: eigene Aktionen',
 };
 
@@ -59,6 +61,7 @@ export const EFFECT_HELPERS: Record<string, string> = {
     'Music Assistant: Titel, Album oder Playlist aus deiner Bibliothek (z. B. „Last Christmas“) oder die volle Adresse einer Datei (http://…). Mediaplayer: Adresse einer Datei oder eines Streams. Eigene Dateien nach /config/www/ legen und mit voller Adresse eintragen, z. B. http://homeassistant.local:8123/local/advent/lied.mp3 – am besten ohne Leerzeichen im Namen.',
   music_volume: 'Leer lassen, um die Lautstärke nicht zu ändern.',
   music_days: 'Leer lassen für jedes Türchen.',
+  music_controls: 'Zeigt im geöffneten Türchen Pause, Weiter und Stopp – und „Abspielen“, um das Lied noch einmal zu hören.',
   effect:
     'Für Profis: beliebige Aktionen oder ein Script. Scripts bekommen tag (Nummer des Türchens) und person mit.',
 };
@@ -169,6 +172,7 @@ export function effectFormData(
     music_media: music?.media_id,
     music_volume: music?.volume,
     music_days: (music?.days ?? []).map(String),
+    music_controls: music?.controls !== false,
     effect: editableCalls(Array.isArray(config.effect) ? config.effect : config.effect ? [config.effect] : []),
   };
 }
@@ -212,6 +216,7 @@ export function effectFormSchema(
         selector: { number: { min: 0, max: 100, step: 5, mode: 'slider', unit_of_measurement: '%' } },
       },
       { name: 'music_days', selector: { select: { multiple: true, mode: 'dropdown', options: DAY_OPTIONS } } },
+      { name: 'music_controls', selector: { boolean: {} } },
     );
   }
   fields.push({ name: 'effect', selector: { action: {} } });
@@ -280,6 +285,10 @@ function musicConfig(
     .sort((a, b) => a - b);
   if (days.length > 0) {
     music.days = [...new Set(days)];
+  }
+  // Standard ist „an“: nur das Abschalten wird gespeichert.
+  if (value.music_controls === false) {
+    music.controls = false;
   }
   return music;
 }

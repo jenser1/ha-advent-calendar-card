@@ -73,7 +73,10 @@ export function validateSimpleEffects(config: AdventCalendarCardConfig): void {
     if (!isRecord(music)) {
       throw new Error('„effect_music“ braucht z. B. „entity_id: media_player.wohnzimmer“ und „media_id“.');
     }
-    checkKeys(music, 'effect_music', ['entity_id', 'player', 'media_id', 'media_type', 'volume', 'days']);
+    checkKeys(music, 'effect_music', ['entity_id', 'player', 'media_id', 'media_type', 'volume', 'days', 'controls']);
+    if (music.controls !== undefined && typeof music.controls !== 'boolean') {
+      throw new Error('„effect_music.controls“ muss true oder false sein.');
+    }
     checkEntity(music.entity_id, 'effect_music', 'media_player');
     if (music.player !== undefined && !MUSIC_PLAYERS.includes(music.player as never)) {
       throw new Error('„effect_music.player“ muss „music_assistant“ oder „media_player“ sein.');
@@ -391,4 +394,69 @@ export async function runSimpleEffects(
     runMusic(hass, config.effect_music, variables),
   ]);
   return results.flat();
+}
+
+/** Was die Musik-Tasten im geöffneten Türchen anzeigen. */
+export interface MusicControl {
+  entityId: string;
+  /** Zustand des Players, z. B. playing, paused, idle. */
+  state: string;
+  /** Was gerade läuft (media_title), falls bekannt. */
+  title?: string;
+  /** Name des Players. */
+  name: string;
+}
+
+export type MusicAction = 'pause' | 'play' | 'stop' | 'replay';
+
+/**
+ * Musik-Tasten für dieses Türchen – nur, wenn an diesem Türchen Musik eingestellt ist,
+ * der Player existiert und die Tasten nicht abgeschaltet sind (controls: false).
+ */
+export function musicControlFor(
+  hass: HomeAssistant | undefined,
+  music: MusicEffectConfig | undefined,
+  day: number,
+): MusicControl | undefined {
+  if (!music?.entity_id || music.controls === false || musicCalls(music, day).length === 0) {
+    return undefined;
+  }
+  const stateObj = hass?.states?.[music.entity_id];
+  if (!stateObj) {
+    return undefined;
+  }
+  const title = stateObj.attributes?.media_title;
+  const name = stateObj.attributes?.friendly_name;
+  return {
+    entityId: music.entity_id,
+    state: stateObj.state,
+    title: typeof title === 'string' && title ? title : undefined,
+    name: typeof name === 'string' && name ? name : music.entity_id,
+  };
+}
+
+const MUSIC_SERVICES: Record<Exclude<MusicAction, 'replay'>, string> = {
+  pause: 'media_pause',
+  play: 'media_play',
+  stop: 'media_stop',
+};
+
+/** Führt eine Musik-Taste aus. „replay“ spielt die Musik des Türchens noch einmal ab. Liefert Fehler. */
+export async function controlMusic(
+  hass: HomeAssistant,
+  music: MusicEffectConfig | undefined,
+  action: MusicAction,
+  variables: EffectVariables,
+): Promise<string[]> {
+  if (!music?.entity_id) {
+    return [];
+  }
+  if (action === 'replay') {
+    return runMusic(hass, music, variables);
+  }
+  return runEffects(
+    hass,
+    { action: `media_player.${MUSIC_SERVICES[action]}`, target: { entity_id: music.entity_id } },
+    variables,
+  );
 }

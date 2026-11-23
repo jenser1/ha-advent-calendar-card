@@ -10,7 +10,14 @@ import {
   sharedEffectNotice,
   validateEffect,
 } from './blocks/effect';
-import { restoreVolumes, runSimpleEffects, validateSimpleEffects } from './blocks/simple-effect';
+import {
+  controlMusic,
+  musicControlFor,
+  restoreVolumes,
+  runSimpleEffects,
+  validateSimpleEffects,
+  type MusicAction,
+} from './blocks/simple-effect';
 import { adventSunday } from './advent-sundays';
 import {
   SHARED_FILE,
@@ -136,7 +143,29 @@ export class AdventCalendarCard extends LitElement {
       this.requestUpdate();
     } else if (previous?.themes?.darkMode !== hass?.themes?.darkMode) {
       this.requestUpdate();
+    } else if (this.openDay !== undefined && this.musicStateChanged(previous, hass)) {
+      // Musik-Tasten im offenen Türchen aktuell halten (Pause ↔ Weiter).
+      this.requestUpdate();
     }
+  }
+
+  private musicStateChanged(previous: HomeAssistant | undefined, hass: HomeAssistant | undefined): boolean {
+    const entity = this.config?.effect_music?.entity_id;
+    return !!entity && previous?.states?.[entity] !== hass?.states?.[entity];
+  }
+
+  private onMusicControl(event: CustomEvent<{ action: MusicAction }>): void {
+    const hass = this._hass;
+    const day = this.openDay;
+    const user = hass?.user;
+    if (!hass || day === undefined || !this.config) {
+      return;
+    }
+    const match = user ? calendarFor(this.config, user) : undefined;
+    const variables = { tag: day, person: match?.person ?? user?.name ?? '' };
+    void this.reportEffectErrors(
+      controlMusic(hass, this.config.effect_music, event.detail.action, variables).then((errors) => [errors]),
+    );
   }
 
   /** Dunkles Design laut HA; ohne Angabe von HA zählt die Einstellung des Geräts. */
@@ -576,8 +605,12 @@ export class AdventCalendarCard extends LitElement {
           .advent=${openDay !== undefined && this.config.advent_candles !== false
             ? adventSunday(year, openDay)
             : undefined}
+          .music=${openDay !== undefined
+            ? musicControlFor(this._hass, this.config.effect_music, openDay)
+            : undefined}
           @advent-dialog-close=${() => (this.openDay = undefined)}
           @task-toggle=${this.onTaskToggle}
+          @music-control=${this.onMusicControl}
         ></advent-calendar-dialog>
         ${snow}
       </ha-card>

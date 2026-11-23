@@ -166,6 +166,8 @@ export interface MusicEffectConfig {
   volume?: number;
   /** Nur an diesen Türchen (1–24); leer = an jedem Türchen. */
   days?: number[];
+  /** Tasten für Pause, Weiter und Stopp im geöffneten Türchen; Standard: true. */
+  controls?: boolean;
 }
 
 export interface CalendarConfig {

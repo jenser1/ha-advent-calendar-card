@@ -3,6 +3,7 @@ import { property, query, state } from 'lit/decorators.js';
 import { blockStyles, hasVisibleContent, renderBlocks } from './blocks';
 import { parseVideo } from './blocks/video';
 import { candleStyles, renderAdventCandles } from './advent-candles';
+import type { MusicAction, MusicControl } from './blocks/simple-effect';
 import type { DoorContent } from './types';
 
 export const DIALOG_TAG = 'advent-calendar-dialog';
@@ -13,7 +14,8 @@ export const DEFAULT_EMPTY_TEXT = 'Heute ist das Türchen leer – schön, dass 
  * Modal mit dem Inhalt eines Türchens. Nutzt das native <dialog>-Element statt
  * HA-interner Komponenten, damit es über HA-Versionen hinweg stabil bleibt.
  *
- * Events: `advent-dialog-close`, `task-toggle` (detail: { day, done, shared }).
+ * Events: `advent-dialog-close`, `task-toggle` (detail: { day, done, shared }),
+ * `music-control` (detail: { action }).
  */
 type Section = 'shared' | 'personal';
 
@@ -29,6 +31,8 @@ export class AdventCalendarDialog extends LitElement {
   @property({ type: Boolean }) sharedTaskDone = false;
   /** 1–4 am Adventssonntag: so viele Kerzen erscheinen neben dem Video. */
   @property({ type: Number }) advent?: number;
+  /** Musik dieses Türchens: zeigt Tasten für Pause, Weiter und Stopp. */
+  @property({ attribute: false }) music?: MusicControl;
 
   /** Abschnitte, deren Rätsel-Lösung schon aufgedeckt ist. */
   @state() private revealed: ReadonlySet<Section> = new Set();
@@ -127,6 +131,61 @@ export class AdventCalendarDialog extends LitElement {
         align-self: center;
       }
 
+      .music {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 8px 14px;
+        border-radius: 12px;
+        background: var(--secondary-background-color, #f2f2f2);
+      }
+
+      .music .info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .music .title,
+      .music .player {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .music .player {
+        font-size: 0.8em;
+        color: var(--secondary-text-color, #727272);
+      }
+
+      .music button {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 36px;
+        padding: 0 12px;
+        border: none;
+        border-radius: 18px;
+        background: var(--primary-color, #03a9f4);
+        color: var(--text-primary-color, #fff);
+        font: inherit;
+        font-size: 0.9em;
+        cursor: pointer;
+      }
+
+      .music button.secondary {
+        background: transparent;
+        color: inherit;
+        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.2));
+      }
+
+      .music button:focus-visible {
+        outline: 2px solid var(--primary-color, #03a9f4);
+        outline-offset: 2px;
+      }
+
       /* Schmale Bildschirme: Kerzen über dem Video. */
       @media (max-width: 420px) {
         .video-row {
@@ -197,6 +256,38 @@ export class AdventCalendarDialog extends LitElement {
     });
   }
 
+  private onMusic(action: MusicAction): void {
+    this.dispatchEvent(new CustomEvent('music-control', { detail: { action }, bubbles: true, composed: true }));
+  }
+
+  /** Musik-Leiste: läuft → Pause + Stopp, pausiert → Weiter + Stopp, sonst → Nochmal abspielen. */
+  private renderMusic(music: MusicControl) {
+    if (music.state === 'unavailable' || music.state === 'unknown') {
+      return nothing;
+    }
+    const running = music.state === 'playing' || music.state === 'buffering';
+    const paused = music.state === 'paused';
+    const button = (action: MusicAction, label: string, icon: string, secondary = false) => html`
+      <button class=${secondary ? 'secondary' : ''} data-action=${action} @click=${() => this.onMusic(action)}>
+        <span aria-hidden="true">${icon}</span>${label}
+      </button>
+    `;
+    return html`
+      <div class="music" role="group" aria-label="Musik">
+        <div class="info">
+          <span class="title">🎵 ${running || paused ? (music.title ?? 'Musik') : 'Musik zum Türchen'}</span>
+          <span class="player">${music.name}</span>
+        </div>
+        ${running
+          ? button('pause', 'Pause', '⏸')
+          : paused
+            ? button('play', 'Weiter', '▶')
+            : button('replay', 'Abspielen', '▶')}
+        ${running || paused ? button('stop', 'Stopp', '⏹', true) : nothing}
+      </div>
+    `;
+  }
+
   /** Vier Kerzen für den Adventssonntag, davon `advent` angezündet, mit „2. Advent“. */
   private renderCandles(advent: number, row = false) {
     return html`
@@ -242,6 +333,7 @@ export class AdventCalendarDialog extends LitElement {
           <h2 id="title">Türchen ${this.day}</h2>
           <button class="close" aria-label="Schließen" @click=${this.requestClose}>✕</button>
         </header>
+        ${this.music ? this.renderMusic(this.music) : nothing}
         ${candlesAt === 'top' ? this.renderCandles(advent!, true) : nothing}
         ${both ? html`<h3 class="section">🎄 Für alle</h3>` : nothing}
         ${shared ? this.renderSection('shared', shared, aside('shared')) : nothing}
