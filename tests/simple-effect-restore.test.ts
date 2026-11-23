@@ -287,10 +287,31 @@ describe('Musik: Lautstärke danach zurück', () => {
     setPlayer(hass, 'playing', 0.3);
     restoreVolumes(hass, start + 1000);
     setPlayer(hass, 'playing', 0.33);
-    restoreVolumes(hass, start + 5000);
+    restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 2000);
     setPlayer(hass, 'paused', 0.33);
     restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 3000);
     expect(names(hass).filter((name) => name === 'media_player.volume_set')).toHaveLength(1);
+  });
+
+  it('folgt beim Anlaufen den Zwischenwerten des Geräts (25 % → 8 % → 27 %)', async () => {
+    const hass = home('on', 'idle', 0.2);
+    const config: AdventCalendarCardConfig = {
+      type: 'x',
+      effect_music: { entity_id: 'media_player.kueche', player: 'media_player', media_id: '/local/a.mp3', volume: 35 },
+    };
+    await runSimpleEffects(hass, config, VARS);
+    const start = Date.now();
+    for (const [volume, at] of [
+      [0.25, 100],
+      [0.08, 500],
+      [0.27, 5000],
+    ]) {
+      setPlayer(hass, 'playing', volume);
+      restoreVolumes(hass, start + at);
+    }
+    setPlayer(hass, 'idle', 0.27);
+    restoreVolumes(hass, start + 25_000);
+    expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.2 });
   });
 
   it('ruft nichts auf, wenn das Gerät nie eine neue Lautstärke meldet', async () => {

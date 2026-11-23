@@ -150,6 +150,11 @@ export const MUSIC_START_TIMEOUT_MS = 60_000;
  * geändert“ – dann bleibt sie, wie sie ist.
  */
 export const VOLUME_TOLERANCE = 0.011;
+/**
+ * So lange nach dem Start zählt der zuletzt gemeldete Wert als „von der Karte gesetzt“.
+ * Manche Geräte tasten sich mit Zwischenwerten heran (z. B. 25 % → 8 % → 27 %).
+ */
+export const VOLUME_SETTLE_MS = 10_000;
 
 /** So lange bleibt eine Lampe ohne eigene Blink-Funktion beim nachgebauten Blinken an bzw. aus. */
 export const BLINK_MS = 1000;
@@ -328,11 +333,8 @@ export function restoreVolumes(hass: HomeAssistant | undefined, now = Date.now()
   }
   for (const [entityId, pending] of pendingVolumes) {
     const current = volumeOf(hass, entityId);
-    if (
-      pending.reported === undefined &&
-      current !== undefined &&
-      Math.abs(current - pending.previous) > VOLUME_TOLERANCE
-    ) {
+    const settling = pending.reported === undefined || now - pending.since < VOLUME_SETTLE_MS;
+    if (settling && current !== undefined && Math.abs(current - pending.previous) > VOLUME_TOLERANCE) {
       pending.reported = current;
     }
     const state = hass.states[entityId]?.state;
