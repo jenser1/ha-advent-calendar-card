@@ -142,10 +142,11 @@ export const MUSIC_START_GRACE_MS = 10_000;
 /** Spielt die Musik bis dahin nicht, wird die Lautstärke trotzdem zurückgestellt. */
 export const MUSIC_START_TIMEOUT_MS = 60_000;
 /**
- * Viele Geräte stellen die Lautstärke nur in Stufen ein (z. B. 35 % → 37 %). Erst eine
- * größere Abweichung gilt als „selbst geändert“ – dann bleibt die Lautstärke, wie sie ist.
+ * Rundungsspielraum beim Vergleich von Lautstärken. Weicht die Lautstärke am Ende um mehr als
+ * das von dem Wert ab, den das Gerät nach dem Setzen gemeldet hat, gilt sie als „selbst
+ * geändert“ – dann bleibt sie, wie sie ist.
  */
-export const VOLUME_TOLERANCE = 0.05;
+export const VOLUME_TOLERANCE = 0.011;
 
 /** So lange bleibt eine Lampe ohne eigene Blink-Funktion beim nachgebauten Blinken an bzw. aus. */
 export const BLINK_MS = 1000;
@@ -291,6 +292,11 @@ interface PendingVolume {
   previous: number;
   /** Von der Karte gesetzte Lautstärke (0–1). */
   set: number;
+  /**
+   * Was das Gerät nach dem Setzen tatsächlich meldet. Viele Geräte runden auf eigene Stufen
+   * (35 % → 30 % oder 37 %), darum zählt dieser Wert und nicht der gesetzte.
+   */
+  reported?: number;
   since: number;
   playing: boolean;
 }
@@ -318,6 +324,14 @@ export function restoreVolumes(hass: HomeAssistant | undefined, now = Date.now()
     return;
   }
   for (const [entityId, pending] of pendingVolumes) {
+    const current = volumeOf(hass, entityId);
+    if (
+      pending.reported === undefined &&
+      current !== undefined &&
+      Math.abs(current - pending.previous) > VOLUME_TOLERANCE
+    ) {
+      pending.reported = current;
+    }
     const state = hass.states[entityId]?.state;
     if (state === 'playing' || state === 'buffering') {
       pending.playing = pending.playing || state === 'playing';
@@ -329,8 +343,11 @@ export function restoreVolumes(hass: HomeAssistant | undefined, now = Date.now()
       continue;
     }
     pendingVolumes.delete(entityId);
-    const current = volumeOf(hass, entityId);
-    if (current !== undefined && Math.abs(current - pending.set) > VOLUME_TOLERANCE) {
+    // Nie eine neue Lautstärke gemeldet: Es steht noch die alte, nichts zu tun.
+    if (pending.reported === undefined || current === undefined) {
+      continue;
+    }
+    if (Math.abs(current - pending.reported) > VOLUME_TOLERANCE) {
       continue;
     }
     hass

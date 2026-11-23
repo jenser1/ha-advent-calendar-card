@@ -261,6 +261,49 @@ describe('Musik: Lautstärke danach zurück', () => {
     expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.13 });
   });
 
+  it('nimmt den vom Gerät gemeldeten Wert als Maßstab (35 % → 30 %)', async () => {
+    const hass = home('on', 'paused', 0.23);
+    const config: AdventCalendarCardConfig = {
+      type: 'x',
+      effect_music: { entity_id: 'media_player.kueche', player: 'media_player', media_id: '/local/a.mp3', volume: 35 },
+    };
+    await runSimpleEffects(hass, config, VARS);
+    const start = Date.now();
+    setPlayer(hass, 'playing', 0.3);
+    restoreVolumes(hass, start + 1000);
+    setPlayer(hass, 'paused', 0.3);
+    restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 3000);
+    expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.23 });
+  });
+
+  it('lässt auch eine leicht nachgeregelte Lautstärke in Ruhe', async () => {
+    const hass = home('on', 'paused', 0.23);
+    const config: AdventCalendarCardConfig = {
+      type: 'x',
+      effect_music: { entity_id: 'media_player.kueche', player: 'media_player', media_id: '/local/a.mp3', volume: 35 },
+    };
+    await runSimpleEffects(hass, config, VARS);
+    const start = Date.now();
+    setPlayer(hass, 'playing', 0.3);
+    restoreVolumes(hass, start + 1000);
+    setPlayer(hass, 'playing', 0.33);
+    restoreVolumes(hass, start + 5000);
+    setPlayer(hass, 'paused', 0.33);
+    restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 3000);
+    expect(names(hass).filter((name) => name === 'media_player.volume_set')).toHaveLength(1);
+  });
+
+  it('ruft nichts auf, wenn das Gerät nie eine neue Lautstärke meldet', async () => {
+    const hass = home('on');
+    await runSimpleEffects(hass, MUSIC, VARS);
+    const start = Date.now();
+    setPlayer(hass, 'playing', 0.2);
+    restoreVolumes(hass, start + 1000);
+    setPlayer(hass, 'idle', 0.2);
+    restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 3000);
+    expect(names(hass).filter((name) => name === 'media_player.volume_set')).toHaveLength(1);
+  });
+
   it('lässt eine selbst geänderte Lautstärke in Ruhe', async () => {
     const hass = home('on');
     await runSimpleEffects(hass, MUSIC, VARS);
