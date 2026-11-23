@@ -7,6 +7,7 @@ import type {
   MusicEffectConfig,
   MusicPlayer,
 } from '../types';
+import { MAX_DURATION, MIN_DURATION } from '../blocks/simple-effect';
 import { setOrDelete, type FormField } from './shared';
 
 /** Wert der Medienauswahl von HA (Selector „media“). */
@@ -22,6 +23,7 @@ export interface EffectFormData {
   light_entity?: string;
   light_mode?: LightMode;
   light_effect?: string;
+  light_duration?: number;
   music_entity?: string;
   music_player?: MusicPlayer;
   music_pick?: MediaPick;
@@ -35,6 +37,7 @@ export const EFFECT_LABELS: Record<string, string> = {
   light_entity: 'Licht',
   light_mode: 'Was das Licht macht',
   light_effect: 'Lichteffekt',
+  light_duration: 'Wie lange',
   music_entity: 'Musik auf',
   music_player: 'Abspielen über',
   music_pick: 'Aus Medien auswählen',
@@ -47,6 +50,8 @@ export const EFFECT_LABELS: Record<string, string> = {
 export const EFFECT_HELPERS: Record<string, string> = {
   light_entity: 'Bei jedem Türchen. Leer lassen für kein Licht.',
   light_effect: 'Effekte aus der Liste der Lampe, z. B. bei WLED „Rainbow“.',
+  light_duration:
+    'Danach ist die Lampe wieder wie vorher (aus bzw. mit alter Farbe oder altem Effekt). Leer lassen, damit der Effekt weiterläuft.',
   music_entity: 'Leer lassen für keine Musik.',
   music_pick:
     'Am einfachsten: durch deine Medien klicken – eigene Dateien (Medien → Lokale Medien), Music Assistant, Radio. Trägt Titel und Art selbst ein und stellt auf „Mediaplayer“.',
@@ -157,6 +162,7 @@ export function effectFormData(
     light_entity: light?.entity_id,
     light_mode: light?.mode ?? 'flash',
     light_effect: light?.effect,
+    light_duration: light?.duration,
     music_entity: music?.entity_id,
     music_player: music?.player ?? defaultPlayer(hass),
     music_pick: mediaPick(music),
@@ -189,6 +195,10 @@ export function effectFormSchema(
             ? { select: { mode: 'dropdown', custom_value: true, options: effects } }
             : { text: {} },
       });
+      fields.push({
+        name: 'light_duration',
+        selector: { number: { min: MIN_DURATION, max: 60, step: 1, mode: 'box', unit_of_measurement: 's' } },
+      });
     }
   }
   fields.push({ name: 'music_entity', selector: { entity: { domain: 'media_player' } } });
@@ -217,6 +227,10 @@ function lightConfig(value: EffectFormData): LightEffectConfig | undefined {
     light.mode = 'effect';
     if (value.light_effect?.trim()) {
       light.effect = value.light_effect.trim();
+    }
+    const duration = value.light_duration;
+    if (typeof duration === 'number' && Number.isFinite(duration)) {
+      light.duration = Math.min(MAX_DURATION, Math.max(MIN_DURATION, Math.round(duration)));
     }
   }
   return light;

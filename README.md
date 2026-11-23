@@ -99,6 +99,7 @@ effect_light:
   entity_id: light.wohnzimmer
   mode: effect          # flash (Standard) = kurz blinken, effect = Lichteffekt
   effect: Rainbow
+  duration: 10          # Sekunden, danach wie vorher; weglassen = Effekt läuft weiter
 effect_music:
   entity_id: media_player.wohnzimmer
   player: music_assistant   # oder media_player (Standard)

@@ -152,8 +152,17 @@ describe('Editor: Effekt-Bereich im Tab „Allgemein“', () => {
     await change(editor, forms(editor)[1], { light_effect: 'Fireworks' });
     expect(last(changes).effect_light).toEqual({ entity_id: 'light.wohnzimmer', mode: 'effect', effect: 'Fireworks' });
 
+    await change(editor, forms(editor)[1], { light_duration: 8 });
+    expect(last(changes).effect_light).toEqual({
+      entity_id: 'light.wohnzimmer',
+      mode: 'effect',
+      effect: 'Fireworks',
+      duration: 8,
+    });
+
     await change(editor, forms(editor)[1], { light_mode: 'flash' });
     expect(last(changes).effect_light).toEqual({ entity_id: 'light.wohnzimmer' });
+    expect(forms(editor)[1].schema.some((item) => item.name === 'light_duration')).toBe(false);
   });
 
   it('schreibt die Musik mit Music Assistant als Standard, wenn es installiert ist', async () => {

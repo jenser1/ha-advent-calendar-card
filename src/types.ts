@@ -146,6 +146,8 @@ export interface LightEffectConfig {
   mode?: LightMode;
   /** Name des Lichteffekts bei mode: effect, z. B. „Rainbow“. */
   effect?: string;
+  /** Sekunden, nach denen die Lampe wie vorher ist (nur bei mode: effect); ohne Angabe läuft der Effekt weiter. */
+  duration?: number;
 }
 
 /** music_assistant: Titel/Name über Music Assistant; media_player: Datei- oder Stream-Adresse. */

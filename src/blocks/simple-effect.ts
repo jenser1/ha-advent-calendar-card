@@ -14,6 +14,9 @@ import { runEffects, type EffectVariables } from './effect';
 
 export const LIGHT_MODES = ['flash', 'effect'] as const;
 export const MUSIC_PLAYERS = ['music_assistant', 'media_player'] as const;
+/** Grenzen für effect_light.duration in Sekunden. */
+export const MIN_DURATION = 1;
+export const MAX_DURATION = 600;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -48,12 +51,21 @@ export function validateSimpleEffects(config: AdventCalendarCardConfig): void {
     if (!isRecord(light)) {
       throw new Error('„effect_light“ braucht z. B. „entity_id: light.wohnzimmer“.');
     }
-    checkKeys(light, 'effect_light', ['entity_id', 'mode', 'effect']);
+    checkKeys(light, 'effect_light', ['entity_id', 'mode', 'effect', 'duration']);
     checkEntity(light.entity_id, 'effect_light', 'light');
     if (light.mode !== undefined && !LIGHT_MODES.includes(light.mode as never)) {
       throw new Error('„effect_light.mode“ muss „flash“ oder „effect“ sein.');
     }
     checkText(light.effect, 'effect_light.effect');
+    const duration = light.duration;
+    if (
+      duration !== undefined &&
+      (typeof duration !== 'number' || duration < MIN_DURATION || duration > MAX_DURATION)
+    ) {
+      throw new Error(
+        `„effect_light.duration“ muss eine Zahl von ${MIN_DURATION} bis ${MAX_DURATION} sein (Sekunden).`,
+      );
+    }
   }
 
   const music: unknown = config.effect_music;
@@ -134,11 +146,6 @@ export const MUSIC_START_TIMEOUT_MS = 60_000;
 export const BLINK_MS = 1000;
 /** LightEntityFeature.FLASH in HA. */
 const FEATURE_FLASH = 8;
-
-/** Lampe war vor dem Blinken aus? Dann blinkt sie nur und bleibt nicht an. */
-function wasOff(hass: HomeAssistant, entityId: string): boolean {
-  return hass.states?.[entityId]?.state === 'off';
-}
 
 /** Kann die Lampe nicht selbst blinken? (Nur, wenn HA das sicher meldet.) */
 function lacksFlash(hass: HomeAssistant, entityId: string): boolean {
@@ -226,8 +233,27 @@ async function runLight(
   if (flash && lacksFlash(hass, entityId)) {
     return blinkByHand(hass, entityId, variables);
   }
-  const restore = flash && wasOff(hass, entityId);
+  const before = hass.states?.[entityId];
+  const duration = light.duration;
   const errors = await runEffects(hass, call, variables);
+  if (!flash && typeof duration === 'number' && errors.length === 0) {
+    // Lichteffekt mit Dauer: danach wie vorher – aus bzw. mit alter Helligkeit, Farbe oder altem Effekt.
+    if (before?.state === 'off' || before?.state === 'on') {
+      const back: EffectCall =
+        before.state === 'off'
+          ? { action: 'light.turn_off', target: { entity_id: entityId }, data: {} }
+          : { action: 'light.turn_on', target: { entity_id: entityId }, data: restoreLightData(before.attributes) };
+      setTimeout(() => {
+        void runEffects(hass, back, variables).then((failed) => {
+          if (failed.length > 0) {
+            console.warn('[advent-calendar-card] Lampe nicht zurückgestellt:', failed);
+          }
+        });
+      }, duration * 1000);
+    }
+    return errors;
+  }
+  const restore = flash && before?.state === 'off';
   if (restore && errors.length === 0) {
     setTimeout(() => {
       hass.callService('light', 'turn_off', {}, { entity_id: entityId }, false).catch((err) =>

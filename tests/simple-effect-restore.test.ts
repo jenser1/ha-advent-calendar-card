@@ -8,6 +8,7 @@ import {
   clearPendingVolumes,
   restoreVolumes,
   runSimpleEffects,
+  validateSimpleEffects,
 } from '../src/blocks/simple-effect';
 import type { AdventCalendarCardConfig } from '../src/types';
 import { mockHass, type MockHass } from './mock-hass';
@@ -136,6 +137,54 @@ describe('Licht ohne eigene Blink-Funktion (z. B. Govee)', () => {
     expect(restoreLightData({ color_mode: 'hs', hs_color: [10, 20], effect: 'none', effect_list: ['none'] })).toEqual({
       hs_color: [10, 20],
     });
+  });
+});
+
+describe('Lichteffekt mit Dauer', () => {
+  const effect = (duration?: number): AdventCalendarCardConfig => ({
+    type: 'x',
+    effect_light: { entity_id: 'light.baum', mode: 'effect', effect: 'rainbow', duration },
+  });
+
+  it('war aus: nach der Dauer wieder aus', async () => {
+    vi.useFakeTimers();
+    const hass = home('off');
+    await runSimpleEffects(hass, effect(8), VARS);
+    await vi.advanceTimersByTimeAsync(7900);
+    expect(names(hass)).toEqual(['light.turn_on']);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(names(hass)).toEqual(['light.turn_on', 'light.turn_off']);
+  });
+
+  it('war an: nach der Dauer mit alter Helligkeit und Farbe', async () => {
+    vi.useFakeTimers();
+    const hass = home('on');
+    hass.states = {
+      ...hass.states,
+      'light.baum': { state: 'on', attributes: { brightness: 120, color_mode: 'rgb', rgb_color: [255, 0, 0] } },
+    };
+    await runSimpleEffects(hass, effect(5), VARS);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(names(hass)).toEqual(['light.turn_on', 'light.turn_on']);
+    expect(hass.serviceCalls[1].data).toEqual({ brightness: 120, rgb_color: [255, 0, 0] });
+  });
+
+  it('ohne Dauer läuft der Effekt weiter', async () => {
+    vi.useFakeTimers();
+    const hass = home('off');
+    await runSimpleEffects(hass, effect(), VARS);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(names(hass)).toEqual(['light.turn_on']);
+  });
+
+  it('prüft die Dauer', () => {
+    expect(() => validateSimpleEffects({ type: 'x', effect_light: { entity_id: 'light.a', duration: 0 } })).toThrow(
+      /1 bis 600/,
+    );
+    expect(() =>
+      validateSimpleEffects({ type: 'x', effect_light: { entity_id: 'light.a', duration: 'lang' as never } }),
+    ).toThrow(/Sekunden/);
+    expect(() => validateSimpleEffects({ type: 'x', effect_light: { entity_id: 'light.a', duration: 10 } })).not.toThrow();
   });
 });
 
