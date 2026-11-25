@@ -61,7 +61,7 @@ export const EFFECT_HELPERS: Record<string, string> = {
     'Music Assistant: Titel, Album oder Playlist aus deiner Bibliothek (z. B. „Last Christmas“) oder die volle Adresse einer Datei (http://…). Mediaplayer: Adresse einer Datei oder eines Streams. Eigene Dateien nach /config/www/ legen und mit voller Adresse eintragen, z. B. http://homeassistant.local:8123/local/advent/lied.mp3 – am besten ohne Leerzeichen im Namen.',
   music_volume: 'Leer lassen, um die Lautstärke nicht zu ändern.',
   music_days: 'Leer lassen für jedes Türchen.',
-  music_controls: 'Zeigt im geöffneten Türchen Pause, Weiter und Stopp – und „Abspielen“, um das Lied noch einmal zu hören.',
+  music_controls: 'Zeigt im geöffneten Türchen Pause, Weiter, Stopp und einen Lautstärkeregler – und „Abspielen“, um das Lied noch einmal zu hören.',
   effect:
     'Für Profis: beliebige Aktionen oder ein Script. Scripts bekommen tag (Nummer des Türchens) und person mit.',
 };

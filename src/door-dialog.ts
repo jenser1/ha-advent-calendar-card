@@ -15,7 +15,7 @@ export const DEFAULT_EMPTY_TEXT = 'Heute ist das Türchen leer – schön, dass 
  * HA-interner Komponenten, damit es über HA-Versionen hinweg stabil bleibt.
  *
  * Events: `advent-dialog-close`, `task-toggle` (detail: { day, done, shared }),
- * `music-control` (detail: { action }).
+ * `music-control` (detail: { action, volume? }).
  */
 type Section = 'shared' | 'personal';
 
@@ -36,6 +36,10 @@ export class AdventCalendarDialog extends LitElement {
 
   /** Abschnitte, deren Rätsel-Lösung schon aufgedeckt ist. */
   @state() private revealed: ReadonlySet<Section> = new Set();
+
+  /** Stellung des Lautstärkereglers in Prozent, bis der Player den neuen Wert meldet. */
+  @state() private volumeDraft?: number;
+  private volumeDragging = false;
 
   @query('dialog') private dialog?: HTMLDialogElement;
 
@@ -133,8 +137,9 @@ export class AdventCalendarDialog extends LitElement {
 
       .music {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 10px;
+        gap: 8px 10px;
         padding: 8px 10px 8px 14px;
         border-radius: 12px;
         background: var(--secondary-background-color, #f2f2f2);
@@ -175,6 +180,29 @@ export class AdventCalendarDialog extends LitElement {
         cursor: pointer;
       }
 
+      .music .volume {
+        flex: 1 0 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .music .volume input {
+        flex: 1;
+        min-width: 0;
+        min-height: 32px;
+        margin: 0;
+        accent-color: var(--primary-color, #03a9f4);
+        cursor: pointer;
+      }
+
+      .music .volume output {
+        min-width: 3.2em;
+        text-align: right;
+        font-size: 0.9em;
+        font-variant-numeric: tabular-nums;
+      }
+
       .music button.secondary {
         background: transparent;
         color: inherit;
@@ -186,8 +214,17 @@ export class AdventCalendarDialog extends LitElement {
         outline-offset: 2px;
       }
 
-      /* Schmale Bildschirme: Kerzen über dem Video. */
+      /* Schmale Bildschirme: Kerzen über dem Video, Musiktitel in eigener Zeile. */
       @media (max-width: 420px) {
+        .music .info {
+          flex: 1 0 100%;
+        }
+
+        .music button {
+          flex: 1;
+          justify-content: center;
+        }
+
         .video-row {
           flex-direction: column-reverse;
           align-items: center;
@@ -205,6 +242,11 @@ export class AdventCalendarDialog extends LitElement {
   protected willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('day') || (changed.has('open') && !this.open)) {
       this.revealed = new Set();
+      this.volumeDraft = undefined;
+      this.volumeDragging = false;
+    }
+    if (changed.has('music') && !this.volumeDragging && changed.get('music')?.volume !== this.music?.volume) {
+      this.volumeDraft = undefined;
     }
   }
 
@@ -260,6 +302,44 @@ export class AdventCalendarDialog extends LitElement {
     this.dispatchEvent(new CustomEvent('music-control', { detail: { action }, bubbles: true, composed: true }));
   }
 
+  private onVolumeInput(event: Event): void {
+    this.volumeDragging = true;
+    this.volumeDraft = Number((event.target as HTMLInputElement).value);
+  }
+
+  /** Erst beim Loslassen senden, damit der Player nicht mit Befehlen überhäuft wird. */
+  private onVolumeChange(event: Event): void {
+    this.volumeDragging = false;
+    this.volumeDraft = Number((event.target as HTMLInputElement).value);
+    this.dispatchEvent(
+      new CustomEvent('music-control', {
+        detail: { action: 'volume', volume: this.volumeDraft / 100 },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private renderVolume(volume: number) {
+    const percent = this.volumeDraft ?? Math.round(volume * 100);
+    return html`
+      <div class="volume">
+        <span aria-hidden="true">🔊</span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          aria-label="Lautstärke"
+          .value=${String(percent)}
+          @input=${this.onVolumeInput}
+          @change=${this.onVolumeChange}
+        />
+        <output>${percent} %</output>
+      </div>
+    `;
+  }
+
   /** Musik-Leiste: läuft → Pause + Stopp, pausiert → Weiter + Stopp, sonst → Nochmal abspielen. */
   private renderMusic(music: MusicControl) {
     if (music.state === 'unavailable' || music.state === 'unknown') {
@@ -284,6 +364,7 @@ export class AdventCalendarDialog extends LitElement {
             ? button('play', 'Weiter', '▶')
             : button('replay', 'Abspielen', '▶')}
         ${running || paused ? button('stop', 'Stopp', '⏹', true) : nothing}
+        ${(running || paused) && music.volume !== undefined ? this.renderVolume(music.volume) : nothing}
       </div>
     `;
   }

@@ -154,7 +154,7 @@ export class AdventCalendarCard extends LitElement {
     return !!entity && previous?.states?.[entity] !== hass?.states?.[entity];
   }
 
-  private onMusicControl(event: CustomEvent<{ action: MusicAction }>): void {
+  private onMusicControl(event: CustomEvent<{ action: MusicAction; volume?: number }>): void {
     const hass = this._hass;
     const day = this.openDay;
     const user = hass?.user;
@@ -164,7 +164,9 @@ export class AdventCalendarCard extends LitElement {
     const match = user ? calendarFor(this.config, user) : undefined;
     const variables = { tag: day, person: match?.person ?? user?.name ?? '' };
     void this.reportEffectErrors(
-      controlMusic(hass, this.config.effect_music, event.detail.action, variables).then((errors) => [errors]),
+      controlMusic(hass, this.config.effect_music, event.detail.action, variables, event.detail.volume).then(
+        (errors) => [errors],
+      ),
     );
   }
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { clearPendingVolumes, musicControlFor, validateSimpleEffects } from '../src/blocks/simple-effect';
+import { clearPendingVolumes, musicControlFor, restoreVolumes, validateSimpleEffects } from '../src/blocks/simple-effect';
 import type { AdventCalendarCardConfig, MusicEffectConfig } from '../src/types';
 import { mockHass, type MockHass } from './mock-hass';
 import { doors, renderCard, setNow, settle } from './render-card';
@@ -72,6 +72,7 @@ describe('Musik-Tasten im Türchen', () => {
       state: 'idle',
       title: 'Weihnachtsbaum',
       name: 'Soundbar',
+      volume: 0.2,
     });
     expect(musicControlFor(hass, MUSIC, 5)).toBeUndefined();
     expect(musicControlFor(hass, { ...MUSIC, controls: false }, 6)).toBeUndefined();
@@ -120,6 +121,45 @@ describe('Musik-Tasten im Türchen', () => {
       'media_player.play_media',
     ]);
     expect(hass.serviceCalls[before].target).toEqual({ entity_id: 'media_player.soundbar' });
+  });
+
+  it('hat einen Regler: sendet beim Loslassen, danach kommt trotzdem die alte Lautstärke', async () => {
+    const hass = home('playing');
+    const { card, dialog } = await openDoor(6, hass);
+    const slider = dialog.shadowRoot!.querySelector<HTMLInputElement>('.music .volume input')!;
+    expect(slider.value).toBe('20');
+    const before = hass.serviceCalls.length;
+
+    slider.value = '50';
+    slider.dispatchEvent(new Event('input'));
+    await settle(dialog);
+    expect(dialog.shadowRoot!.querySelector('.music output')!.textContent).toBe('50 %');
+    expect(hass.serviceCalls).toHaveLength(before);
+
+    slider.dispatchEvent(new Event('change'));
+    await settle(card);
+    expect(hass.serviceCalls).toHaveLength(before + 1);
+    expect(hass.serviceCalls[before]).toMatchObject({
+      service: 'volume_set',
+      data: { volume_level: 0.5 },
+      target: { entity_id: 'media_player.soundbar' },
+    });
+
+    const player = (state: string) => ({
+      ...hass,
+      states: { 'media_player.soundbar': { state, attributes: { volume_level: 0.5 } } },
+    });
+    restoreVolumes(player('playing'), Date.now() + 1000);
+    restoreVolumes(player('idle'), Date.now() + 30_000);
+    expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.2 });
+  });
+
+  it('zeigt keinen Regler, wenn nichts läuft oder der Player keine Lautstärke kann', async () => {
+    const idle = await openDoor(6, home('idle'));
+    expect(idle.dialog.shadowRoot!.querySelector('.volume')).toBeNull();
+    const hass = home('playing');
+    hass.states!['media_player.soundbar'].attributes!.supported_features = 1;
+    expect(musicControlFor(hass, MUSIC, 6)!.volume).toBeUndefined();
   });
 
   it('zeigt nichts an Türchen ohne Musik oder wenn abgeschaltet', async () => {

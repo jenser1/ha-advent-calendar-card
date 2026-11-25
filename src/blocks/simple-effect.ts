@@ -407,9 +407,14 @@ export interface MusicControl {
   title?: string;
   /** Name des Players. */
   name: string;
+  /** Lautstärke (0–1); fehlt, wenn der Player keine meldet oder sie nicht einstellen kann. */
+  volume?: number;
 }
 
-export type MusicAction = 'pause' | 'play' | 'stop' | 'replay';
+export type MusicAction = 'pause' | 'play' | 'stop' | 'replay' | 'volume';
+
+/** MediaPlayerEntityFeature.VOLUME_SET */
+const FEATURE_VOLUME_SET = 4;
 
 /**
  * Musik-Tasten für dieses Türchen – nur, wenn an diesem Türchen Musik eingestellt ist,
@@ -429,15 +434,18 @@ export function musicControlFor(
   }
   const title = stateObj.attributes?.media_title;
   const name = stateObj.attributes?.friendly_name;
+  const features = stateObj.attributes?.supported_features;
+  const canSetVolume = typeof features !== 'number' || (features & FEATURE_VOLUME_SET) !== 0;
   return {
     entityId: music.entity_id,
     state: stateObj.state,
     title: typeof title === 'string' && title ? title : undefined,
     name: typeof name === 'string' && name ? name : music.entity_id,
+    volume: canSetVolume ? volumeOf(hass!, music.entity_id) : undefined,
   };
 }
 
-const MUSIC_SERVICES: Record<Exclude<MusicAction, 'replay'>, string> = {
+const MUSIC_SERVICES: Record<Exclude<MusicAction, 'replay' | 'volume'>, string> = {
   pause: 'media_pause',
   play: 'media_play',
   stop: 'media_stop',
@@ -449,9 +457,27 @@ export async function controlMusic(
   music: MusicEffectConfig | undefined,
   action: MusicAction,
   variables: EffectVariables,
+  volume?: number,
 ): Promise<string[]> {
   if (!music?.entity_id) {
     return [];
+  }
+  if (action === 'volume') {
+    if (volume === undefined || !Number.isFinite(volume)) {
+      return [];
+    }
+    const level = Math.min(1, Math.max(0, volume));
+    // Am Regler im Türchen gilt die Änderung nur dem Lied: Danach kommt trotzdem die alte zurück.
+    const pending = pendingVolumes.get(music.entity_id);
+    if (pending) {
+      pending.set = level;
+      pending.reported = level;
+    }
+    return runEffects(
+      hass,
+      { action: 'media_player.volume_set', target: { entity_id: music.entity_id }, data: { volume_level: level } },
+      variables,
+    );
   }
   if (action === 'replay') {
     return runMusic(hass, music, variables);
