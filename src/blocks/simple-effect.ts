@@ -5,6 +5,17 @@ import type {
   LightEffectConfig,
   MusicEffectConfig,
 } from '../types';
+import {
+  browserMusicState,
+  browserVolume,
+  canSetBrowserVolume,
+  pauseBrowserMusic,
+  playBrowserMusic,
+  resumeBrowserMusic,
+  setBrowserVolume,
+  stopBrowserMusic,
+  unlockBrowserMusic,
+} from './browser-music';
 import { runEffects, type EffectVariables } from './effect';
 
 /**
@@ -13,7 +24,7 @@ import { runEffects, type EffectVariables } from './effect';
  */
 
 export const LIGHT_MODES = ['flash', 'effect'] as const;
-export const MUSIC_PLAYERS = ['music_assistant', 'media_player'] as const;
+export const MUSIC_PLAYERS = ['music_assistant', 'media_player', 'browser'] as const;
 /** Grenzen für effect_light.duration in Sekunden. */
 export const MIN_DURATION = 1;
 export const MAX_DURATION = 600;
@@ -79,7 +90,7 @@ export function validateSimpleEffects(config: AdventCalendarCardConfig): void {
     }
     checkEntity(music.entity_id, 'effect_music', 'media_player');
     if (music.player !== undefined && !MUSIC_PLAYERS.includes(music.player as never)) {
-      throw new Error('„effect_music.player“ muss „music_assistant“ oder „media_player“ sein.');
+      throw new Error('„effect_music.player“ muss „music_assistant“, „media_player“ oder „browser“ sein.');
     }
     checkText(music.media_id, 'effect_music.media_id');
     checkText(music.media_type, 'effect_music.media_type');
@@ -108,10 +119,41 @@ export function lightCall(light: LightEffectConfig | undefined): EffectCall | un
   return { action: 'light.turn_on', target: { entity_id: light.entity_id }, data };
 }
 
+/** Adresse des Lieds, wenn es an diesem Türchen auf dem Gerät selbst laufen soll. */
+function browserMedia(music: MusicEffectConfig | undefined, day: number): string | undefined {
+  const media = music?.media_id?.trim();
+  if (music?.player !== 'browser' || !media || (music.days?.length && !music.days.includes(day))) {
+    return undefined;
+  }
+  return media;
+}
+
+/** Solange das Lied läuft, gibt es die Tasten in jedem Türchen: Sonst wäre es nicht zu stoppen. */
+function browserControlMedia(music: MusicEffectConfig | undefined, day: number): string | undefined {
+  return browserMusicState() === 'idle' ? browserMedia(music, day) : browserMedia(music, music?.days?.[0] ?? day);
+}
+
+/** Beim Tippen auf ein Türchen aufrufen: erlaubt dem Browser, gleich Musik abzuspielen. */
+export function prepareMusic(music: MusicEffectConfig | undefined, day: number): void {
+  if (browserMedia(music, day)) {
+    unlockBrowserMusic();
+  }
+}
+
+/** Dateiname ohne Endung als Titel. */
+function mediaTitle(media: string): string | undefined {
+  const name = media.split(/[?#]/)[0].split('/').pop() ?? '';
+  try {
+    return decodeURIComponent(name).replace(/\.[a-z0-9]{2,4}$/i, '') || undefined;
+  } catch {
+    return name || undefined;
+  }
+}
+
 /** Aufrufe für die Musik in der richtigen Reihenfolge (erst Lautstärke, dann abspielen). */
 export function musicCalls(music: MusicEffectConfig | undefined, day: number): EffectCall[] {
   const media = music?.media_id?.trim();
-  if (!music?.entity_id || !media) {
+  if (!music?.entity_id || !media || music.player === 'browser') {
     return [];
   }
   if (music.days && music.days.length > 0 && !music.days.includes(day)) {
@@ -366,6 +408,10 @@ async function runMusic(
   music: MusicEffectConfig | undefined,
   variables: EffectVariables,
 ): Promise<string[]> {
+  const media = browserMedia(music, variables.tag);
+  if (media) {
+    return playBrowserMusic(hass, media, music?.volume === undefined ? undefined : music.volume / 100);
+  }
   const calls = musicCalls(music, variables.tag);
   const entityId = music?.entity_id;
   const volumeCall = calls.find((call) => call.action === 'media_player.volume_set');
@@ -425,6 +471,18 @@ export function musicControlFor(
   music: MusicEffectConfig | undefined,
   day: number,
 ): MusicControl | undefined {
+  const media = browserControlMedia(music, day);
+  if (media) {
+    return music?.controls === false
+      ? undefined
+      : {
+          entityId: 'browser',
+          state: browserMusicState(),
+          title: mediaTitle(media),
+          name: 'Dieses Gerät',
+          volume: canSetBrowserVolume() ? browserVolume() : undefined,
+        };
+  }
   if (!music?.entity_id || music.controls === false || musicCalls(music, day).length === 0) {
     return undefined;
   }
@@ -451,6 +509,33 @@ const MUSIC_SERVICES: Record<Exclude<MusicAction, 'replay' | 'volume'>, string> 
   stop: 'media_stop',
 };
 
+async function controlBrowser(
+  hass: HomeAssistant,
+  music: MusicEffectConfig | undefined,
+  action: MusicAction,
+  variables: EffectVariables,
+  volume: number | undefined,
+): Promise<string[]> {
+  switch (action) {
+    case 'pause':
+      pauseBrowserMusic();
+      return [];
+    case 'play':
+      return resumeBrowserMusic();
+    case 'stop':
+      stopBrowserMusic();
+      return [];
+    case 'volume':
+      if (volume !== undefined && Number.isFinite(volume)) {
+        setBrowserVolume(volume);
+      }
+      return [];
+    case 'replay':
+      unlockBrowserMusic();
+      return runMusic(hass, music, variables);
+  }
+}
+
 /** Führt eine Musik-Taste aus. „replay“ spielt die Musik des Türchens noch einmal ab. Liefert Fehler. */
 export async function controlMusic(
   hass: HomeAssistant,
@@ -459,6 +544,9 @@ export async function controlMusic(
   variables: EffectVariables,
   volume?: number,
 ): Promise<string[]> {
+  if (browserControlMedia(music, variables.tag)) {
+    return controlBrowser(hass, music, action, variables, volume);
+  }
   if (!music?.entity_id) {
     return [];
   }

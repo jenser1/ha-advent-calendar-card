@@ -89,6 +89,7 @@ Im Editor gibt es im Bereich **Effekt beim ersten Öffnen**:
 
 - **Licht:** eine Lampe, die bei jedem Türchen kurz blinkt oder einen Lichteffekt startet. Die Effekte kommen aus der Liste der Lampe (z. B. bei WLED „Rainbow“). War die Lampe vor dem Blinken aus, geht sie danach wieder aus. Lampen ohne eigene Blink-Funktion (z. B. viele Govee) schaltet die Karte einmal kurz um und stellt danach Helligkeit, Farbe bzw. Effekt wieder her.
 - **Musik:** ein Mediaplayer, ein Titel und auf Wunsch Lautstärke und Türchen (z. B. nur am 6. und 24.). Abspielen geht über Music Assistant (Titel, Album oder Playlist aus deiner Bibliothek oder die volle Adresse einer Datei) oder über den normalen Mediaplayer (Adresse einer Datei oder eines Streams). Nach der Musik stellt die Karte die vorherige Lautstärke wieder ein – solange das Dashboard offen bleibt, und nur, wenn du die Lautstärke nicht inzwischen selbst geändert hast.
+- **Auf diesem Gerät (`player: browser`):** Das Lied läuft in dem Browser, Handy oder Tablet, auf dem das Türchen geöffnet wird – ganz ohne Lautsprecher in Home Assistant (kein `entity_id`). Es gehen Dateien aus „Medien“, `/local/…` und Internet-Adressen, aber keine Titel aus Music Assistant. Über `https` müssen auch die Adressen mit `https` beginnen. Blockiert der Browser den Start, tippst du im Türchen auf **Abspielen**. Auf iPhone und iPad regelst du die Lautstärke mit den Gerätetasten. Verlässt du das Dashboard, hört die Musik auf.
 - **Musik-Tasten im Türchen:** An Türchen mit Musik zeigt das geöffnete Türchen eine kleine Leiste mit **Pause**, **Weiter**, **Stopp** und einem **Lautstärkeregler** – oder **Abspielen**, um das Lied noch einmal zu hören. Der Regler gilt nur für das Lied: Danach stellt die Karte trotzdem die vorherige Lautstärke ein (sofern unter `volume` eine Lautstärke eingestellt ist). Abschalten mit `controls: false` bzw. dem Schalter „Musik-Tasten im Türchen“ im Editor.
 - **Aus Medien auswählen (am einfachsten):** Klick dich wie unter „Medien“ in Home Assistant zu deiner Datei, Playlist oder Radiostation durch. Eigene Lieder lädst du vorher unter **Medien → Lokale Medien** hoch. Die Karte übernimmt Player, Medium und Art (`media_type`) selbst und stellt auf „Mediaplayer“.
 - **Eigene MP3-Datei von Hand:** nach `/config/www/advent/` legen (am besten ohne Leerzeichen im Namen) und mit **voller** Adresse eintragen, z. B. `http://homeassistant.local:8123/local/advent/lied.mp3`. Nur der Dateiname oder `/local/…` reicht nicht, weil der Lautsprecher die Datei selbst abholen muss.
@@ -103,7 +104,7 @@ effect_light:
   duration: 10          # Sekunden, danach wie vorher; weglassen = Effekt läuft weiter
 effect_music:
   entity_id: media_player.wohnzimmer
-  player: music_assistant   # oder media_player (Standard)
+  player: music_assistant   # oder media_player (Standard) oder browser
   media_id: Last Christmas
   volume: 30                # Prozent, weglassen = Lautstärke bleibt
   days: [6, 24]             # weglassen = an jedem Türchen

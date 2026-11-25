@@ -150,8 +150,11 @@ export interface LightEffectConfig {
   duration?: number;
 }
 
-/** music_assistant: Titel/Name über Music Assistant; media_player: Datei- oder Stream-Adresse. */
-export type MusicPlayer = 'music_assistant' | 'media_player';
+/**
+ * music_assistant: Titel/Name über Music Assistant; media_player: Datei- oder Stream-Adresse;
+ * browser: auf dem Gerät, das den Kalender anzeigt (ohne entity_id).
+ */
+export type MusicPlayer = 'music_assistant' | 'media_player' | 'browser';
 
 export interface MusicEffectConfig {
   /** Mediaplayer, z. B. media_player.wohnzimmer; ohne Player oder Titel passiert nichts. */

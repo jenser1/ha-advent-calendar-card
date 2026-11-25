@@ -10,9 +10,11 @@ import {
   sharedEffectNotice,
   validateEffect,
 } from './blocks/effect';
+import { onBrowserMusic } from './blocks/browser-music';
 import {
   controlMusic,
   musicControlFor,
+  prepareMusic,
   restoreVolumes,
   runSimpleEffects,
   validateSimpleEffects,
@@ -120,6 +122,7 @@ export class AdventCalendarCard extends LitElement {
   private contentIncomplete = false;
   private contentRequest = 0;
   private wasConnected = false;
+  private stopMusicUpdates?: () => void;
 
   get hass(): HomeAssistant | undefined {
     return this._hass;
@@ -234,12 +237,14 @@ export class AdventCalendarCard extends LitElement {
     this.wasConnected = true;
     this.dayTimer = window.setInterval(() => this.refresh(), DAY_CHECK_INTERVAL_MS);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
+    this.stopMusicUpdates = onBrowserMusic(() => this.requestUpdate());
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.clearInterval(this.dayTimer);
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    this.stopMusicUpdates?.();
   }
 
   private onVisibilityChange = (): void => {
@@ -359,6 +364,7 @@ export class AdventCalendarCard extends LitElement {
       this.toast(daysLeft === 1 ? 'Noch 1 Tag!' : `Noch ${daysLeft} Tage!`);
     } else if (status === 'openable') {
       door.playOpening();
+      prepareMusic(this.config?.effect_music, day);
       void this.openDoor(day);
       // Erst aufklappen lassen, dann den Inhalt zeigen.
       if (prefersReducedMotion()) {

@@ -54,6 +54,8 @@ export const EFFECT_HELPERS: Record<string, string> = {
   light_effect: 'Effekte aus der Liste der Lampe, z. B. bei WLED „Rainbow“.',
   light_duration:
     'Danach ist die Lampe wieder wie vorher (aus bzw. mit alter Farbe oder altem Effekt). Leer lassen, damit der Effekt weiterläuft.',
+  music_player:
+    'Leer lassen für keine Musik. „Dieses Gerät“ spielt dort, wo das Türchen geöffnet wird – ohne Lautsprecher in Home Assistant, aber nur Dateien aus „Medien“ oder Adressen.',
   music_entity: 'Leer lassen für keine Musik.',
   music_pick:
     'Am einfachsten: durch deine Medien klicken – eigene Dateien (Medien → Lokale Medien), Music Assistant, Radio. Trägt Titel und Art selbst ein und stellt auf „Mediaplayer“.',
@@ -74,6 +76,7 @@ const LIGHT_MODE_OPTIONS: { value: LightMode; label: string }[] = [
 const MUSIC_PLAYER_OPTIONS: { value: MusicPlayer; label: string }[] = [
   { value: 'music_assistant', label: 'Music Assistant – Titel oder Name' },
   { value: 'media_player', label: 'Mediaplayer – Datei- oder Stream-Adresse' },
+  { value: 'browser', label: 'Dieses Gerät – Browser, Handy oder Tablet' },
 ];
 
 const DAY_OPTIONS = Array.from({ length: 24 }, (_, index) => ({
@@ -94,6 +97,9 @@ function effectList(hass: HomeAssistant | undefined, entity: string | undefined)
 
 /** Was die Medienauswahl anzeigt: Player und – beim Mediaplayer – das gewählte Medium. */
 function mediaPick(music: MusicEffectConfig | undefined): MediaPick | undefined {
+  if (music?.player === 'browser') {
+    return music.media_id ? { media_content_id: music.media_id, media_content_type: 'music' } : undefined;
+  }
   if (!music?.entity_id) {
     return undefined;
   }
@@ -167,7 +173,7 @@ export function effectFormData(
     light_effect: light?.effect,
     light_duration: light?.duration,
     music_entity: music?.entity_id,
-    music_player: music?.player ?? defaultPlayer(hass),
+    music_player: music ? (music.player ?? defaultPlayer(hass)) : undefined,
     music_pick: mediaPick(music),
     music_media: music?.media_id,
     music_volume: music?.volume,
@@ -205,11 +211,15 @@ export function effectFormSchema(
       });
     }
   }
-  fields.push({ name: 'music_entity', selector: { entity: { domain: 'media_player' } } });
-  if (music?.entity_id) {
+  fields.push({ name: 'music_player', selector: { select: { mode: 'dropdown', options: MUSIC_PLAYER_OPTIONS } } });
+  const browser = music?.player === 'browser';
+  if (!browser) {
+    fields.push({ name: 'music_entity', selector: { entity: { domain: 'media_player' } } });
+  }
+  if (music?.entity_id || browser) {
     fields.push(
-      { name: 'music_player', selector: { select: { mode: 'dropdown', options: MUSIC_PLAYER_OPTIONS } } },
-      { name: 'music_pick', selector: { media: {} } },
+      // Mit „accept“ zeigt HA nur die Medien, ohne Auswahl eines Players.
+      { name: 'music_pick', selector: { media: browser ? { accept: ['audio/*'] } : {} } },
       { name: 'music_media', selector: { text: {} } },
       {
         name: 'music_volume',
@@ -246,6 +256,12 @@ function musicConfig(
   hass: HomeAssistant | undefined,
   previous: MusicEffectConfig | undefined,
 ): MusicEffectConfig | undefined {
+  if (value.music_player === 'browser') {
+    return browserConfig(value, previous);
+  }
+  if (previous?.player === 'browser' && !value.music_player) {
+    return undefined;
+  }
   let entity = value.music_entity;
   let player = value.music_player ?? defaultPlayer(hass);
   let media = value.music_media?.trim() || undefined;
@@ -267,7 +283,8 @@ function musicConfig(
     type = undefined;
   }
   if (!entity) {
-    return undefined;
+    // Erst „Abspielen über“ gewählt, der Player fehlt noch.
+    return value.music_player && !previous?.entity_id ? { player } : undefined;
   }
   const music: MusicEffectConfig = { entity_id: entity, player };
   if (media) {
@@ -276,6 +293,28 @@ function musicConfig(
   if (type && player === 'media_player' && media) {
     music.media_type = type;
   }
+  addCommonMusic(music, value);
+  return music;
+}
+
+/** Musik auf dem Gerät selbst: kein Player, nur Adressen und Dateien aus „Medien“. */
+function browserConfig(value: EffectFormData, previous: MusicEffectConfig | undefined): MusicEffectConfig {
+  const music: MusicEffectConfig = { player: 'browser' };
+  const picked = value.music_pick?.media_content_id;
+  let media = value.music_media?.trim() || undefined;
+  if (picked && picked !== mediaPick(previous)?.media_content_id) {
+    media = picked;
+  }
+  // Beim Wechsel hierher fällt z. B. ein Titel aus Music Assistant weg.
+  const switched = previous !== undefined && previous.player !== 'browser';
+  if (media && (!switched || /^(https?:\/\/|\/|media-source:\/\/)/i.test(media))) {
+    music.media_id = media;
+  }
+  addCommonMusic(music, value);
+  return music;
+}
+
+function addCommonMusic(music: MusicEffectConfig, value: EffectFormData): void {
   if (typeof value.music_volume === 'number') {
     music.volume = value.music_volume;
   }
@@ -290,7 +329,6 @@ function musicConfig(
   if (value.music_controls === false) {
     music.controls = false;
   }
-  return music;
 }
 
 /** Überträgt das Formular in die Config; leere Bereiche fallen ganz weg. */

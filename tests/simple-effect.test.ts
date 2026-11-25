@@ -133,7 +133,7 @@ describe('Licht und Musik ohne YAML (effect_light, effect_music)', () => {
 describe('Editor: Effekt-Bereich im Tab „Allgemein“', () => {
   it('zeigt erst nur Licht, Musik und „Erweitert“', async () => {
     const { editor } = await renderEditor({});
-    expect(forms(editor)[1].schema.map((field) => field.name)).toEqual(['light_entity', 'music_entity', 'effect']);
+    expect(forms(editor)[1].schema.map((field) => field.name)).toEqual(['light_entity', 'music_player', 'music_entity', 'effect']);
   });
 
   it('bietet die Lichteffekte der Lampe zur Auswahl an', async () => {
@@ -172,8 +172,8 @@ describe('Editor: Effekt-Bereich im Tab „Allgemein“', () => {
     expect(last(changes).effect_music).toEqual({ entity_id: 'media_player.wohnzimmer', player: 'music_assistant' });
     expect(forms(editor)[1].schema.map((field) => field.name)).toEqual([
       'light_entity',
-      'music_entity',
       'music_player',
+      'music_entity',
       'music_pick',
       'music_media',
       'music_volume',
