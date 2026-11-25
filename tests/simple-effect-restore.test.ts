@@ -314,7 +314,7 @@ describe('Musik: Lautstärke danach zurück', () => {
     expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.2 });
   });
 
-  it('ruft nichts auf, wenn das Gerät nie eine neue Lautstärke meldet', async () => {
+  it('stellt auch zurück, wenn der Player nie eine neue Lautstärke meldet', async () => {
     const hass = home('on');
     await runSimpleEffects(hass, MUSIC, VARS);
     const start = Date.now();
@@ -322,7 +322,27 @@ describe('Musik: Lautstärke danach zurück', () => {
     restoreVolumes(hass, start + 1000);
     setPlayer(hass, 'idle', 0.2);
     restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 3000);
-    expect(names(hass).filter((name) => name === 'media_player.volume_set')).toHaveLength(1);
+    expect(names(hass).filter((name) => name === 'media_player.volume_set')).toHaveLength(2);
+    expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.2 });
+  });
+
+  it('stellt zurück, wenn der Player zu früh wieder den alten Wert meldet (20 → 10 → 20 %)', async () => {
+    // Echter Fall: Music Assistant meldet 20 %, die Soundbar selbst steht noch auf 10 %.
+    const hass = home('on', 'playing', 0.2);
+    const config: AdventCalendarCardConfig = {
+      type: 'x',
+      effect_music: { entity_id: 'media_player.kueche', player: 'media_player', media_id: '/local/a.mp3', volume: 10 },
+    };
+    await runSimpleEffects(hass, config, VARS);
+    const start = Date.now();
+    setPlayer(hass, 'playing', 0.1);
+    restoreVolumes(hass, start + 100);
+    setPlayer(hass, 'playing', 0.2);
+    restoreVolumes(hass, start + 700);
+    setPlayer(hass, 'paused', 0.2);
+    restoreVolumes(hass, start + MUSIC_START_GRACE_MS + 3000);
+    expect(names(hass).filter((name) => name === 'media_player.volume_set')).toHaveLength(2);
+    expect(hass.serviceCalls[hass.serviceCalls.length - 1].data).toEqual({ volume_level: 0.2 });
   });
 
   it('lässt eine selbst geänderte Lautstärke in Ruhe', async () => {

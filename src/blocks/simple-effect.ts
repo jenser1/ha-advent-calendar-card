@@ -145,14 +145,13 @@ export const MUSIC_START_GRACE_MS = 10_000;
 /** Spielt die Musik bis dahin nicht, wird die Lautstärke trotzdem zurückgestellt. */
 export const MUSIC_START_TIMEOUT_MS = 60_000;
 /**
- * Rundungsspielraum beim Vergleich von Lautstärken. Weicht die Lautstärke am Ende um mehr als
- * das von dem Wert ab, den das Gerät nach dem Setzen gemeldet hat, gilt sie als „selbst
- * geändert“ – dann bleibt sie, wie sie ist.
+ * Rundungsspielraum beim Vergleich von Lautstärken. Passt die Lautstärke am Ende weder zur alten
+ * noch zur gesetzten oder gemeldeten, gilt sie als „selbst geändert“ und bleibt, wie sie ist.
  */
 export const VOLUME_TOLERANCE = 0.011;
 /**
  * So lange nach dem Start zählt der zuletzt gemeldete Wert als „von der Karte gesetzt“.
- * Manche Geräte tasten sich mit Zwischenwerten heran (z. B. 25 % → 8 % → 27 %).
+ * Player melden kurz nach dem Start teils Zwischenwerte (z. B. 25 % → 8 % → 27 %).
  */
 export const VOLUME_SETTLE_MS = 10_000;
 
@@ -301,8 +300,8 @@ interface PendingVolume {
   /** Von der Karte gesetzte Lautstärke (0–1). */
   set: number;
   /**
-   * Was das Gerät nach dem Setzen tatsächlich meldet. Viele Geräte runden auf eigene Stufen
-   * (35 % → 30 % oder 37 %), darum zählt dieser Wert und nicht der gesetzte.
+   * Was der Player nach dem Setzen meldet. Das kann vom gesetzten Wert abweichen und muss
+   * nicht stimmen, zählt aber nicht als Änderung von Hand.
    */
   reported?: number;
   since: number;
@@ -348,11 +347,12 @@ export function restoreVolumes(hass: HomeAssistant | undefined, now = Date.now()
       continue;
     }
     pendingVolumes.delete(entityId);
-    // Nie eine neue Lautstärke gemeldet: Es steht noch die alte, nichts zu tun.
-    if (pending.reported === undefined || current === undefined) {
-      continue;
-    }
-    if (Math.abs(current - pending.reported) > VOLUME_TOLERANCE) {
+    // Meldet der Player wieder die alte Lautstärke, kann das Gerät trotzdem noch auf der gesetzten
+    // stehen (Music Assistant meldet zeitweise einen veralteten Wert). Darum auch dann zurückstellen;
+    // nur ein Wert, der zu nichts davon passt, stammt von Hand.
+    const known = [pending.previous, pending.set, pending.reported];
+    const matches = (value?: number) => value !== undefined && Math.abs(current! - value) <= VOLUME_TOLERANCE;
+    if (current !== undefined && !known.some(matches)) {
       continue;
     }
     hass
