@@ -203,6 +203,10 @@ npm version patch
 git push --follow-tags
 ```
 
+## Entstehung
+
+Idee, Inhalte und Tests: Jens. Den Code habe ich zusammen mit [Claude Code](https://claude.com/claude-code) von Anthropic geschrieben.
+
 ## Lizenz
 
 [MIT](LICENSE)
